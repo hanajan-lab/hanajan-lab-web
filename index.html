@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>花雀LAB ～詰め麻雀研究所～</title>
+  <style>
+    :root {
+      --bg:#fffafc;
+      --panel:#ffffff;
+      --text:#2b2b2b;
+      --muted:#6f6f6f;
+      --accent:#d94b79;
+      --accent-soft:#fde8ef;
+      --border:#e7d9df;
+      --green:#2d7b55;
+    }
+    * { box-sizing:border-box; }
+    body {
+      margin:0;
+      font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    main {
+      width:min(980px, 100%);
+      margin:0 auto;
+      padding:20px 14px 40px;
+    }
+    header {
+      text-align:center;
+      padding:18px 8px 10px;
+    }
+    h1 { margin:0; font-size:clamp(28px,5vw,46px); }
+    .subtitle { margin:8px 0 0; font-size:clamp(16px,3vw,22px); color:var(--muted); }
+    .panel {
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:16px;
+      margin-top:16px;
+      box-shadow:0 5px 18px rgba(70,30,45,.06);
+    }
+    .stats {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+    }
+    .stat {
+      background:var(--accent-soft);
+      border-radius:14px;
+      padding:12px;
+      text-align:center;
+    }
+    .stat b { display:block; font-size:24px; margin-top:3px; }
+    .message {
+      margin:14px 0 0;
+      padding:12px;
+      border-radius:12px;
+      background:#f7f7f7;
+      min-height:48px;
+      font-size:17px;
+    }
+    .hand-title {
+      display:flex;
+      align-items:end;
+      justify-content:space-between;
+      gap:12px;
+      margin:4px 0 10px;
+    }
+    .hand-title h2 { margin:0; font-size:20px; }
+    .hint { color:var(--muted); font-size:13px; }
+    #hand {
+      display:flex;
+      flex-wrap:wrap;
+      gap:7px;
+      align-items:flex-end;
+      min-height:92px;
+    }
+    .tile {
+      width:58px;
+      min-height:82px;
+      border:1px solid #bbb;
+      border-radius:8px;
+      background:linear-gradient(#fff,#f7f3eb);
+      box-shadow:0 3px 0 #d8d1c4;
+      padding:4px 3px 5px;
+      color:#111;
+      cursor:pointer;
+    }
+    .tile:disabled { cursor:default; opacity:1; }
+    .tile.drawn { outline:3px solid var(--accent); transform:translateY(-5px); }
+    .glyph { display:block; font-size:38px; line-height:1.05; }
+    .label { display:block; font-size:12px; margin-top:2px; color:#333; }
+    .controls {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:16px;
+    }
+    button.control {
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:white;
+      padding:11px 16px;
+      font-size:16px;
+      cursor:pointer;
+    }
+    button.primary {
+      background:var(--accent);
+      color:white;
+      border-color:var(--accent);
+      font-weight:700;
+    }
+    button.control:disabled { opacity:.45; cursor:not-allowed; }
+    .answer-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+      margin-top:10px;
+    }
+    label { font-size:14px; }
+    input {
+      width:100%;
+      margin-top:5px;
+      padding:11px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      font-size:16px;
+    }
+    .record {
+      margin-top:10px;
+      font-weight:700;
+      color:var(--green);
+      min-height:24px;
+    }
+    footer {
+      text-align:center;
+      color:var(--muted);
+      font-size:13px;
+      margin-top:18px;
+    }
+    @media (max-width:600px) {
+      .tile { width:48px; min-height:72px; }
+      .glyph { font-size:32px; }
+      .label { font-size:11px; }
+      .answer-grid { grid-template-columns:1fr; }
+      .stats { grid-template-columns:repeat(3,1fr); }
+      .stat b { font-size:20px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🌸 花雀LAB</h1>
+    <p class="subtitle">～詰め麻雀研究所～</p>
+  </header>
+
+  <section class="panel">
+    <div class="stats">
+      <div class="stat">巡目<b id="turn">0</b></div>
+      <div class="stat">山の残り<b id="wallCount">30</b></div>
+      <div class="stat">状態<b id="status">開始前</b></div>
+    </div>
+    <div id="message" class="message" aria-live="polite">「新しい練習」を押してください。</div>
+  </section>
+
+  <section class="panel">
+    <div class="hand-title">
+      <h2>一人ツモ練習</h2>
+      <div class="hint">ツモ後、切りたい牌をクリックします</div>
+    </div>
+    <div id="hand" aria-label="手牌"></div>
+
+    <div class="controls">
+      <button id="newGame" class="control primary" type="button">新しい練習</button>
+      <button id="drawBtn" class="control" type="button" disabled>1枚ツモる</button>
+      <button id="sortBtn" class="control" type="button">並べ替え</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top:0">和了したら、声に出して答える</h2>
+    <p class="hint">例：「リーチ、タンヤオ、ドラ1、5200点！」</p>
+    <div class="answer-grid">
+      <label>役
+        <input id="yakuInput" placeholder="リーチ・タンヤオなど">
+      </label>
+      <label>点数
+        <input id="pointsInput" inputmode="numeric" placeholder="5200">
+      </label>
+    </div>
+    <div class="controls">
+      <button id="recordBtn" class="control" type="button">今回の答えを記録</button>
+    </div>
+    <div id="record" class="record" aria-live="polite"></div>
+  </section>
+
+  <footer>まずはVer.1。毎日10分、楽しく自主練。</footer>
+</main>
+
+<script>
+const labels = [
+  '1萬','2萬','3萬','4萬','5萬','6萬','7萬','8萬','9萬',
+  '1筒','2筒','3筒','4筒','5筒','6筒','7筒','8筒','9筒',
+  '1索','2索','3索','4索','5索','6索','7索','8索','9索',
+  '東','南','西','北','白','發','中'
+];
+const glyphs = [
+  '🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏',
+  '🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡',
+  '🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘',
+  '🀀','🀁','🀂','🀃','🀆','🀅','🀄'
+];
+
+let hand = [], wall = [], turn = 0, awaitingDiscard = false, drawnIndex = -1, finished = false;
+
+const handEl = document.getElementById('hand');
+const msgEl = document.getElementById('message');
+const turnEl = document.getElementById('turn');
+const wallCountEl = document.getElementById('wallCount');
+const statusEl = document.getElementById('status');
+const drawBtn = document.getElementById('drawBtn');
+
+function makeTiles() {
+  const all = [];
+  for (let i=0;i<34;i++) for (let j=0;j<4;j++) all.push(i);
+  return all;
+}
+function shuffle(a) {
+  for (let i=a.length-1;i>0;i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function sortHandOnly() {
+  hand.sort((a,b)=>a-b);
+  drawnIndex = -1;
+  render();
+}
+function render() {
+  handEl.innerHTML='';
+  hand.forEach((tile,index)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='tile'+(index===drawnIndex && awaitingDiscard ? ' drawn':'');
+    b.disabled=!awaitingDiscard || finished;
+    b.innerHTML=`<span class="glyph">${glyphs[tile]}</span><span class="label">${labels[tile]}</span>`;
+    b.setAttribute('aria-label', labels[tile]+'を切る');
+    b.addEventListener('click',()=>discard(index));
+    handEl.appendChild(b);
+  });
+  turnEl.textContent=turn;
+  wallCountEl.textContent=wall.length;
+  drawBtn.disabled=awaitingDiscard || finished || wall.length===0 || hand.length!==13;
+}
+function newGame() {
+  const tiles=shuffle(makeTiles());
+  hand=tiles.splice(0,13);
+  wall=tiles.splice(0,30);
+  turn=0; awaitingDiscard=false; drawnIndex=-1; finished=false;
+  hand.sort((a,b)=>a-b);
+  statusEl.textContent='練習中';
+  msgEl.textContent='13枚を配りました。「1枚ツモる」を押してください。';
+  document.getElementById('record').textContent='';
+  render();
+}
+function drawTile() {
+  if (awaitingDiscard || finished || wall.length===0) return;
+  hand.push(wall.shift());
+  drawnIndex=hand.length-1;
+  awaitingDiscard=true;
+  turn++;
+  if (isWinningHand(hand)) {
+    finished=true;
+    statusEl.textContent='和了！';
+    msgEl.textContent='和了形です！ 役と点数を声に出してください。';
+  } else {
+    msgEl.textContent=labels[hand[drawnIndex]]+'をツモりました。切る牌を1枚クリックしてください。';
+  }
+  render();
+}
+function discard(index) {
+  if (!awaitingDiscard || finished) return;
+  const removed=hand.splice(index,1)[0];
+  awaitingDiscard=false;
+  drawnIndex=-1;
+  hand.sort((a,b)=>a-b);
+  msgEl.textContent=labels[removed]+'を切りました。次をツモってください。';
+  if (wall.length===0) {
+    finished=true;
+    statusEl.textContent='流局';
+    msgEl.textContent='山がなくなりました。もう一度挑戦しましょう。';
+  }
+  render();
+}
+function countsOf(tiles) {
+  const c=Array(34).fill(0);
+  tiles.forEach(t=>c[t]++);
+  return c;
+}
+function isWinningHand(tiles) {
+  if (tiles.length!==14) return false;
+  const c=countsOf(tiles);
+  return isKokushi(c)||isChiitoi(c)||isStandard(c);
+}
+function isChiitoi(c) {
+  return c.filter(n=>n===2).length===7;
+}
+function isKokushi(c) {
+  const terminals=[0,8,9,17,18,26,27,28,29,30,31,32,33];
+  let pair=false;
+  for (const i of terminals) {
+    if (c[i]===0) return false;
+    if (c[i]>=2) pair=true;
+  }
+  return pair && c.reduce((a,b)=>a+b,0)===14;
+}
+function isStandard(c) {
+  for (let i=0;i<34;i++) {
+    if (c[i]>=2) {
+      c[i]-=2;
+      if (canMakeMelds(c)) { c[i]+=2; return true; }
+      c[i]+=2;
+    }
+  }
+  return false;
+}
+function canMakeMelds(c) {
+  const i=c.findIndex(n=>n>0);
+  if (i===-1) return true;
+  if (c[i]>=3) {
+    c[i]-=3;
+    if (canMakeMelds(c)) { c[i]+=3; return true; }
+    c[i]+=3;
+  }
+  if (i<27) {
+    const p=i%9;
+    if (p<=6 && c[i+1]>0 && c[i+2]>0) {
+      c[i]--; c[i+1]--; c[i+2]--;
+      if (canMakeMelds(c)) { c[i]++; c[i+1]++; c[i+2]++; return true; }
+      c[i]++; c[i+1]++; c[i+2]++;
+    }
+  }
+  return false;
+}
+
+document.getElementById('newGame').addEventListener('click',newGame);
+drawBtn.addEventListener('click',drawTile);
+document.getElementById('sortBtn').addEventListener('click',sortHandOnly);
+document.getElementById('recordBtn').addEventListener('click',()=>{
+  const y=document.getElementById('yakuInput').value.trim();
+  const p=document.getElementById('pointsInput').value.trim();
+  document.getElementById('record').textContent =
+    (!y && !p) ? '役か点数を入力してください。' :
+    `記録：${y || '役未入力'}／${p ? p+'点' : '点数未入力'}`;
+});
+render();
+</script>
+</body>
+</html>
