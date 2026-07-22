@@ -179,7 +179,60 @@ const T={m:n=>n-1,p:n=>9+n-1,s:n=>18+n-1,E:27,S:28,W:29,N:30,H:31,F:32,C:33};
 const $=id=>document.getElementById(id);
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const norm=s=>String(s).replace(/[・,、\s点]/g,'').replace(/オール/g,'all').toLowerCase();
-const sameTiles=(a,b)=>a.length===b.length&&[...a].sort((x,y)=>x-y).every((v,i)=>v===[...b].sort((x,y)=>x-y)[i]);
+function tileCounts(tiles){
+ const c=Array(34).fill(0);
+ tiles.forEach(t=>c[t]++);
+ return c;
+}
+function canMakeMelds(c){
+ let i=c.findIndex(n=>n>0);
+ if(i===-1)return true;
+ if(c[i]>=3){
+   c[i]-=3;
+   if(canMakeMelds(c)){c[i]+=3;return true}
+   c[i]+=3;
+ }
+ if(i<27&&i%9<=6&&c[i+1]>0&&c[i+2]>0){
+   c[i]--;c[i+1]--;c[i+2]--;
+   if(canMakeMelds(c)){c[i]++;c[i+1]++;c[i+2]++;return true}
+   c[i]++;c[i+1]++;c[i+2]++;
+ }
+ return false;
+}
+function isStandardWin(tiles){
+ if(tiles.length!==14)return false;
+ const c=tileCounts(tiles);
+ for(let i=0;i<34;i++){
+   if(c[i]>=2){
+     c[i]-=2;
+     if(canMakeMelds(c)){c[i]+=2;return true}
+     c[i]+=2;
+   }
+ }
+ return false;
+}
+function isSevenPairs(tiles){
+ if(tiles.length!==14)return false;
+ const c=tileCounts(tiles);
+ return c.filter(n=>n===2).length===7;
+}
+function isKokushi(tiles){
+ if(tiles.length!==14)return false;
+ const yaochu=[0,8,9,17,18,26,27,28,29,30,31,32,33];
+ const c=tileCounts(tiles);
+ return yaochu.every(i=>c[i]>=1)&&yaochu.some(i=>c[i]>=2);
+}
+function isWinningHand(tiles){
+ return isStandardWin(tiles)||isSevenPairs(tiles)||isKokushi(tiles);
+}
+function isTenpai(tiles){
+ if(tiles.length!==13)return false;
+ const c=tileCounts(tiles);
+ for(let t=0;t<34;t++){
+   if(c[t]<4&&isWinningHand([...tiles,t]))return true;
+ }
+ return false;
+}
 
 const scenarios=[
  {hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.p(5),T.s(4),T.s(5),T.s(6),T.p(7)],win:T.p(7),round:'東',seat:'南',dealer:'子',dora:T.m(3),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'子の3翻20符ツモ。'},
@@ -236,7 +289,7 @@ function discardTile(i){
  if(!awaitingDiscard||finished)return;
  const t=hand.splice(i,1)[0];discards.push(t);hand.sort((a,b)=>a-b);
  const wasRiichiDeclaration=riichiJustDeclared;
- const validRiichi=wasRiichiDeclaration&&sameTiles(hand,sc.hand);
+ const validRiichi=wasRiichiDeclaration&&isTenpai(hand);
  drawnIndex=-1;currentDraw=null;awaitingDiscard=false;riichiJustDeclared=false;
  if(wasRiichiDeclaration){
    if(validRiichi){
@@ -245,7 +298,7 @@ function discardTile(i){
      $('playMessage').textContent=`${labels[t]}を切って、リーチ成立です。次をツモってください。`;
    }else{
      $('playMessage').className='message error';
-     $('playMessage').textContent=`誤リーチです。その牌を切るとテンパイではありません。リーチは成立せず、このまま続けます。`;
+     $('playMessage').textContent=`誤リーチです。捨てた後の13枚はテンパイしていません。リーチは成立せず、このまま続けます。`;
    }
  }else{
    $('playMessage').className='message';
@@ -281,14 +334,14 @@ function declareTsumo(){
    $('playMessage').textContent='誤ツモです。まだ牌をツモっていません。';
    return;
  }
- if(currentDraw===sc.win){
+ if(isWinningHand(hand)){
    finished=true;awaitingDiscard=false;
    $('playMessage').className='message win';
    $('playMessage').textContent='ツモ成立！ 役と点数を声に出してから入力してください。';
    $('playAnswerPanel').classList.remove('hidden');
  }else{
    $('playMessage').className='message error';
-   $('playMessage').textContent='誤ツモです。まだ和了していません。手牌を見直して1枚切りましょう。';
+   $('playMessage').textContent='誤ツモです。現在の14枚は和了形ではありません。手牌を見直して1枚切りましょう。';
  }
  renderPlay();
 }
