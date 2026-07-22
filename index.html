@@ -1,4 +1,4 @@
-<!-- Verified build: Ver.1.9.0 furiten -->
+<!-- Verified build: Ver.1.10.0 table layout / dealer start / correct celebration -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -57,10 +57,45 @@ button:disabled{opacity:.42;cursor:not-allowed}
   min-height:54px;
   align-content:start;
 }
-.river-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.river-box{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
+.river-grid{
+  display:grid;
+  grid-template-columns:minmax(150px,1fr) minmax(210px,1.35fr) minmax(150px,1fr);
+  grid-template-areas:
+    ". toimen ."
+    "kamicha center shimocha"
+    ". me .";
+  gap:12px;
+  align-items:center;
+}
+.river-box{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff;min-width:0}
 .river-box h3{font-size:15px;margin:0 0 8px;text-align:center}
-.river-box.me{border:2px solid var(--pink)}
+.river-box.kamicha{grid-area:kamicha}
+.river-box.toimen{grid-area:toimen}
+.river-box.shimocha{grid-area:shimocha}
+.river-box.me{grid-area:me;border:2px solid var(--pink)}
+.river-center{
+  grid-area:center;
+  min-height:128px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px dashed var(--line);
+  border-radius:50%;
+  color:var(--muted);
+  font-weight:800;
+  background:radial-gradient(circle,#fff 0 48%,var(--pink2) 49% 100%);
+}
+.correct-stamp{
+  position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:rgba(255,248,251,.35);pointer-events:none;opacity:0;
+}
+.correct-stamp.show{animation:stampFade 1.5s ease forwards}
+.correct-stamp-card{
+  padding:24px 32px;border:5px solid var(--pink);border-radius:24px;background:#fff;
+  color:var(--pink);font-size:clamp(28px,7vw,56px);font-weight:900;text-align:center;
+  box-shadow:0 12px 36px rgba(80,20,50,.22);transform:rotate(-5deg)
+}
+@keyframes stampFade{0%{opacity:0;transform:scale(.45)}18%{opacity:1;transform:scale(1.08)}35%{transform:scale(1)}78%{opacity:1}100%{opacity:0;transform:scale(1.03)}}
 .river-box.me .discards{
   grid-template-columns:repeat(6,47px);
 }
@@ -74,7 +109,18 @@ button:disabled{opacity:.42;cursor:not-allowed}
   }
 }
 
-@media(max-width:640px){.river-grid{grid-template-columns:1fr}}
+@media(max-width:640px){
+  .river-grid{
+    grid-template-columns:minmax(104px,1fr) minmax(104px,1fr);
+    grid-template-areas:
+      "toimen toimen"
+      "kamicha shimocha"
+      "center center"
+      "me me";
+    gap:9px;
+  }
+  .river-center{min-height:62px;border-radius:18px}
+}
 .mini{width:42px;min-height:56px;text-align:center;border:1px solid #ddd0b9;background:#fffdf5;border-radius:6px;padding:3px 2px}
 .mini .glyph{font-size:35px}.mini .label{font-size:10px;margin-top:2px}
 .river-box.me .mini{width:47px;min-height:62px}
@@ -115,7 +161,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.9.0　フリテン実装版</p>
+<p class="sub" style="font-weight:700">Ver.1.10.0　実戦配置・親開始・正解演出版</p>
 </header>
 
 <section class="panel">
@@ -167,16 +213,17 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 
 <section class="panel">
   <h2>捨て牌</h2>
-  <div class="river-grid">
-    <div class="river-box">
-      <h3>上家</h3>
-      <div id="kamichaDiscards" class="discards"></div>
-    </div>
-    <div class="river-box">
+  <div class="river-grid" aria-label="実際の麻雀卓と同じ席順">
+    <div class="river-box toimen">
       <h3>対面</h3>
       <div id="toimenDiscards" class="discards"></div>
     </div>
-    <div class="river-box">
+    <div class="river-box kamicha">
+      <h3>上家</h3>
+      <div id="kamichaDiscards" class="discards"></div>
+    </div>
+    <div class="river-center" aria-hidden="true">麻雀卓</div>
+    <div class="river-box shimocha">
       <h3>下家</h3>
       <div id="shimochaDiscards" class="discards"></div>
     </div>
@@ -240,6 +287,9 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 
 <footer>毎日10分。間違えても大丈夫、声に出すほど強くなる。</footer>
 </main>
+<div id="correctStamp" class="correct-stamp" aria-live="polite" aria-hidden="true">
+  <div class="correct-stamp-card">🌸 よくできました！ 🌸</div>
+</div>
 
 <script>
 'use strict';
@@ -603,6 +653,40 @@ function showCallAnnouncement(text){
  setTimeout(()=>el.classList.remove('show'),1000);
 }
 
+function playCorrectFanfare(){
+ try{
+   const AudioContext=window.AudioContext||window.webkitAudioContext;
+   if(!AudioContext)return;
+   const ctx=new AudioContext();
+   const now=ctx.currentTime;
+   const notes=[523.25,659.25,783.99,1046.5];
+   notes.forEach((freq,i)=>{
+     const osc=ctx.createOscillator();
+     const gain=ctx.createGain();
+     osc.type='sine';
+     osc.frequency.value=freq;
+     gain.gain.setValueAtTime(0.0001,now+i*0.11);
+     gain.gain.exponentialRampToValueAtTime(0.18,now+i*0.11+0.02);
+     gain.gain.exponentialRampToValueAtTime(0.0001,now+i*0.11+0.28);
+     osc.connect(gain);gain.connect(ctx.destination);
+     osc.start(now+i*0.11);osc.stop(now+i*0.11+0.3);
+   });
+   setTimeout(()=>ctx.close(),1200);
+ }catch(_){/* 音が使えない環境ではスタンプだけ表示します。 */}
+}
+function celebrateCorrect(){
+ const stamp=$('correctStamp');
+ stamp.classList.remove('show');
+ stamp.setAttribute('aria-hidden','false');
+ void stamp.offsetWidth;
+ stamp.classList.add('show');
+ playCorrectFanfare();
+ setTimeout(()=>{
+   stamp.classList.remove('show');
+   stamp.setAttribute('aria-hidden','true');
+ },1550);
+}
+
 function renderTile(t,i,clickable){
  const b=document.createElement('button');
  b.type='button';
@@ -659,11 +743,13 @@ function startRound(){
  discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];openMelds=[];
  drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;sameTurnFuriten=false;riichiFuriten=false;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
- $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。残りツモは18回です。「1枚ツモる」を押してください。';
+ $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。親から対局を始めます。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
  $('playYaku').value='';$('playPoints').value='';
  $('playVoiceStatus').className='voice-status';$('playVoiceStatus').textContent='役と点数を一息で話せます。手入力もできます。';
  renderPlay();
+ // 実戦と同じく東家（親）から開始し、自分の番まで他家が順に打ちます。
+ setTimeout(playInitialDealerTurns,250);
 }
 function drawTile(){
  if(!sc||finished)return;
@@ -683,12 +769,80 @@ function drawTile(){
  $('playMessage').textContent=`${labels[t]}をツモりました。和了なら「ツモ！」、違えば切る牌を選んでください。`;
  renderPlay();
 }
+function actorByName(name){
+ const map={
+   '下家':{name:'下家',river:shimochaDiscards},
+   '対面':{name:'対面',river:toimenDiscards},
+   '上家':{name:'上家',river:kamichaDiscards}
+ };
+ return map[name];
+}
+function dealerActorsBeforeSelf(){
+ // 東家（親）から始め、自分の番になる直前までの他家を返します。
+ const before={
+   '東':[],
+   '南':['上家'],
+   '西':['対面','上家'],
+   '北':['下家','対面','上家']
+ };
+ return (before[sc.seat]||[]).map(actorByName);
+}
+function playInitialDealerTurns(){
+ const turns=dealerActorsBeforeSelf();
+ if(turns.length===0){
+   $('playMessage').className='message';
+   $('playMessage').textContent='あなたが親です。最初の牌をツモってください。';
+   renderPlay();
+   return;
+ }
+ opponentsActing=true;
+ let index=0;
+ const next=()=>{
+   if(index>=turns.length){
+     opponentsActing=false;
+     awaitingRonDecision=false;
+     pendingOpponentNext=null;
+     $('playMessage').className='message';
+     $('playMessage').textContent='親から順に打ち、自分の番になりました。「1枚ツモる」を押してください。';
+     renderPlay();
+     return;
+   }
+   const actor=turns[index++];
+   const tile=opponentWall.shift();
+   actor.river.push(tile);
+   lastOpponentTile=tile;
+   lastOpponentName=actor.name;
+   awaitingRonDecision=true;
+   pendingOpponentNext=()=>{
+     clearOpponentAutoTimer();
+     awaitingRonDecision=false;
+     pendingOpponentNext=null;
+     renderPlay();
+     setTimeout(next,180);
+   };
+   $('playMessage').className='message';
+   $('playMessage').textContent=`親から開始：${actor.name}が${labels[tile]}を切りました。ロンか見送りかを判断してください。`;
+   renderPlay();
+   clearOpponentAutoTimer();
+   opponentAutoTimer=setTimeout(()=>{
+     if(awaitingRonDecision&&pendingOpponentNext){
+       recordMissedRon();
+       const go=pendingOpponentNext;
+       $('playMessage').className='message';
+       $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}は自動で次へ進みました。`;
+       go();
+     }
+   },8000);
+ };
+ next();
+}
+
 function playOpponentTurns(){
  opponentsActing=true;
  const turns=[
-   {name:'下家',river:shimochaDiscards},
-   {name:'対面',river:toimenDiscards},
-   {name:'上家',river:kamichaDiscards}
+   actorByName('下家'),
+   actorByName('対面'),
+   actorByName('上家')
  ];
  let index=0;
  const next=()=>{
@@ -1218,7 +1372,9 @@ $('playShow').onclick=()=>playReveal(false);
 $('playCheck').onclick=()=>{
  const y=norm($('playYaku').value),p=norm($('playPoints').value);
  const a=playAnswerData();
- playReveal(answerYakuMatches($('playYaku').value,a.yaku)&&p===norm(a.points));
+ const ok=answerYakuMatches($('playYaku').value,a.yaku)&&p===norm(a.points);
+ playReveal(ok);
+ if(ok)celebrateCorrect();
 };
 
 let quizIndex=0,quizCorrect=0,quizStreak=0;
@@ -1248,6 +1404,7 @@ $('quizCheck').onclick=()=>{
  const ok=answerYakuMatches($('quizYaku').value,a.yaku)&&p===norm(a.points);
  if(ok){quizCorrect++;quizStreak++;}else quizStreak=0;
  $('quizCorrect').textContent=quizCorrect;$('quizStreak').textContent=quizStreak;quizReveal(ok);
+ if(ok)celebrateCorrect();
 };
 $('quizMic').onclick=()=>startVoiceAnswer('quizYaku','quizPoints','quizVoiceStatus','quizMic');
 $('quizShow').onclick=()=>quizReveal(false);
