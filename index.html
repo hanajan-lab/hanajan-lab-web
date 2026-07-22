@@ -50,6 +50,11 @@ button:disabled{opacity:.42;cursor:not-allowed}
 .glyph{display:block;font-size:42px;line-height:1}
 .label{display:block;font-size:11px;margin-top:3px}
 .discards{display:flex;flex-wrap:wrap;gap:4px;min-height:46px}
+.river-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.river-box{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
+.river-box h3{font-size:15px;margin:0 0 8px;text-align:center}
+.river-box.me{border:2px solid var(--pink)}
+@media(max-width:640px){.river-grid{grid-template-columns:1fr}}
 .mini{width:38px;text-align:center;border:1px solid #ddd0b9;background:#fffdf5;border-radius:5px;padding:2px}
 .mini .glyph{font-size:26px}.mini .label{font-size:9px}
 .answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -78,7 +83,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.0　18巡練習版</p>
+<p class="sub" style="font-weight:700">Ver.1.1　他家の捨て牌版</p>
 </header>
 
 <section class="panel">
@@ -123,7 +128,24 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 
 <section class="panel">
   <h2>捨て牌</h2>
-  <div id="discards" class="discards"></div>
+  <div class="river-grid">
+    <div class="river-box">
+      <h3>上家</h3>
+      <div id="kamichaDiscards" class="discards"></div>
+    </div>
+    <div class="river-box">
+      <h3>対面</h3>
+      <div id="toimenDiscards" class="discards"></div>
+    </div>
+    <div class="river-box">
+      <h3>下家</h3>
+      <div id="shimochaDiscards" class="discards"></div>
+    </div>
+    <div class="river-box me">
+      <h3>自分</h3>
+      <div id="discards" class="discards"></div>
+    </div>
+  </div>
 </section>
 
 <section id="playAnswerPanel" class="panel hidden">
@@ -295,7 +317,7 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],discards=[],drawnIndex=-1,currentDraw=null,awaitingDiscard=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],drawnIndex=-1,currentDraw=null,awaitingDiscard=false,opponentsActing=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
 
 function renderTile(t,i,clickable){
  const b=document.createElement('button');
@@ -312,11 +334,15 @@ function renderPlay(){
    const canDiscard=awaitingDiscard&&!finished&&(!riichi||riichiJustDeclared||i===drawnIndex);
    $('playHand').appendChild(renderTile(t,i,canDiscard));
  });
- $('discards').innerHTML=discards.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
+ const riverHtml=arr=>arr.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
+ $('discards').innerHTML=riverHtml(discards);
+ $('kamichaDiscards').innerHTML=riverHtml(kamichaDiscards);
+ $('toimenDiscards').innerHTML=riverHtml(toimenDiscards);
+ $('shimochaDiscards').innerHTML=riverHtml(shimochaDiscards);
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
- $('drawBtn').disabled=!sc||awaitingDiscard||finished||wall.length===0;
- $('riichiBtn').disabled=false;
- $('tsumoBtn').disabled=false;
+ $('drawBtn').disabled=!sc||awaitingDiscard||opponentsActing||finished||wall.length===0;
+ $('riichiBtn').disabled=opponentsActing;
+ $('tsumoBtn').disabled=opponentsActing;
  $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
 }
 function startRound(){
@@ -336,7 +362,11 @@ function startRound(){
  wall=pool.slice(0,17);
  const winPosition=5+Math.floor(Math.random()*13); // 6～18巡目
  wall.splice(winPosition,0,sc.win);
- discards=[];drawnIndex=-1;currentDraw=null;awaitingDiscard=false;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
+ // 自分の山に使った牌を除き、残りから他家3人の捨て牌を用意します。
+ wall.forEach(removeOne);
+ opponentWall=shuffle([...pool]).slice(0,54);
+ discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];
+ drawnIndex=-1;currentDraw=null;awaitingDiscard=false;opponentsActing=false;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。残りツモは18回です。「1枚ツモる」を押してください。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
@@ -345,12 +375,45 @@ function startRound(){
  renderPlay();
 }
 function drawTile(){
- if(!sc||awaitingDiscard||finished||wall.length===0)return;
+ if(!sc||awaitingDiscard||opponentsActing||finished||wall.length===0)return;
  const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;currentDraw=t;awaitingDiscard=true;turn++;riichiJustDeclared=false;
  $('playMessage').className='message';
  $('playMessage').textContent=`${labels[t]}をツモりました。和了なら「ツモ！」、違えば切る牌を選んでください。`;
  renderPlay();
 }
+function playOpponentTurns(){
+ opponentsActing=true;
+ const turns=[
+   {name:'上家',river:kamichaDiscards},
+   {name:'対面',river:toimenDiscards},
+   {name:'下家',river:shimochaDiscards}
+ ];
+ let index=0;
+ const next=()=>{
+   if(index>=turns.length){
+     opponentsActing=false;
+     if(wall.length===0){
+       finished=true;
+       $('playMessage').className='message';
+       $('playMessage').textContent='全員の捨て牌が18枚になり、流局です。「新しい一局」で再挑戦しましょう。';
+     }else{
+       $('playMessage').className='message';
+       $('playMessage').textContent='下家まで打ちました。次の牌をツモってください。';
+     }
+     renderPlay();
+     return;
+   }
+   const actor=turns[index++];
+   const tile=opponentWall.shift();
+   actor.river.push(tile);
+   $('playMessage').className='message';
+   $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。`;
+   renderPlay();
+   setTimeout(next,450);
+ };
+ next();
+}
+
 function discardTile(i){
  if(!awaitingDiscard||finished)return;
  const t=hand.splice(i,1)[0];discards.push(t);hand.sort((a,b)=>a-b);
@@ -368,10 +431,10 @@ function discardTile(i){
    }
  }else{
    $('playMessage').className='message';
-   $('playMessage').textContent=`${labels[t]}を切りました。次をツモってください。`;
+   $('playMessage').textContent=`${labels[t]}を切りました。他家の捨て牌を待ちます。`;
  }
- if(wall.length===0){finished=true;$('playMessage').className='message';$('playMessage').textContent='流局です。「新しい一局」で再挑戦しましょう。'}
  renderPlay();
+ playOpponentTurns();
 }
 function playReveal(correct){
  const a=playAnswerData();
