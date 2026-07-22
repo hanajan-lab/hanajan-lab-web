@@ -28,6 +28,10 @@ h2{margin:0 0 10px}
 .message{text-align:center;font-weight:700;padding:14px;border-radius:13px;background:#faf5f7;margin-top:12px}
 .message.win{background:#e8f7ef;color:var(--green)}
 .message.error{background:#fff0f2;color:var(--red);border:2px solid #efb7c0}
+.voice-status{margin-top:10px;font-weight:700;color:var(--muted)}
+.voice-status.listening{color:var(--green)}
+.voice-status.error{color:var(--red)}
+.mic-listening{outline:3px solid rgba(20,120,80,.25);transform:scale(1.02)}
 .controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
 button{border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px 16px;font-size:16px;font-weight:700;cursor:pointer}
 button:hover:not(:disabled){transform:translateY(-1px)}
@@ -128,10 +132,12 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <label>点数<input id="playPoints" placeholder="1000/2000" inputmode="numeric"></label>
   </div>
   <div class="controls">
+    <button id="playMic" class="blue">🎤 まとめて話す</button>
     <button id="playCheck" class="good">答え合わせ</button>
     <button id="playShow">正解を見る</button>
     <button id="playNext" class="primary">次の一局</button>
   </div>
+  <div id="playVoiceStatus" class="voice-status">役と点数を一息で話せます。手入力もできます。</div>
   <div id="playResult" class="result"></div>
 </section>
 </div>
@@ -151,10 +157,12 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <label>点数<input id="quizPoints" placeholder="700/1300" inputmode="numeric"></label>
   </div>
   <div class="controls">
+    <button id="quizMic" class="blue">🎤 まとめて話す</button>
     <button id="quizCheck" class="good">答え合わせ</button>
     <button id="quizShow">正解を見る</button>
     <button id="quizNext" class="primary">次の問題</button>
   </div>
+  <div id="quizVoiceStatus" class="voice-status">役と点数を一息で話せます。手入力もできます。</div>
   <div id="quizResult" class="result"></div>
 </section>
 </div>
@@ -233,6 +241,51 @@ function isTenpai(tiles){
  }
  return false;
 }
+function doraFromIndicator(indicator){
+ if(indicator<27){
+   const suitStart=Math.floor(indicator/9)*9;
+   return suitStart+((indicator-suitStart+1)%9);
+ }
+ if(indicator>=27&&indicator<=30)return indicator===30?27:indicator+1;
+ return indicator===33?31:indicator+1;
+}
+function countDora(tiles,indicator){
+ const dora=doraFromIndicator(indicator);
+ return tiles.filter(t=>t===dora).length;
+}
+function roundUp100(n){return Math.ceil(n/100)*100}
+function tsumoPoints(han,fu,dealer){
+ let base;
+ if(han>=13)base=8000;
+ else if(han>=11)base=6000;
+ else if(han>=8)base=4000;
+ else if(han>=6)base=3000;
+ else{
+   base=fu*Math.pow(2,han+2);
+   if(han>=5||base>=2000)base=2000;
+ }
+ if(dealer==='親'){
+   const each=roundUp100(base*2);
+   return `${each}オール`;
+ }
+ return `${roundUp100(base)}/${roundUp100(base*2)}`;
+}
+function playAnswerData(){
+ const doraCount=countDora(hand,sc.dora);
+ const yaku=[...sc.yaku];
+ if(riichi)yaku.unshift('リーチ');
+ if(doraCount>0)yaku.push(`ドラ${doraCount}`);
+ const han=sc.han+(riichi?1:0)+doraCount;
+ return {yaku,han,fu:sc.fu,points:tsumoPoints(han,sc.fu,sc.dealer),doraCount};
+}
+function scenarioAnswerData(q){
+ const finalTiles=[...q.hand,q.win];
+ const doraCount=countDora(finalTiles,q.dora);
+ const yaku=[...q.yaku];
+ if(doraCount>0)yaku.push(`ドラ${doraCount}`);
+ const han=q.han+doraCount;
+ return {yaku,han,fu:q.fu,points:tsumoPoints(han,q.fu,q.dealer),doraCount};
+}
 
 const scenarios=[
  {hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.p(5),T.s(4),T.s(5),T.s(6),T.p(7)],win:T.p(7),round:'東',seat:'南',dealer:'子',dora:T.m(3),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'子の3翻20符ツモ。'},
@@ -276,6 +329,7 @@ function startRound(){
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。「1枚ツモる」を押してください。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
  $('playYaku').value='';$('playPoints').value='';
+ $('playVoiceStatus').className='voice-status';$('playVoiceStatus').textContent='役と点数を一息で話せます。手入力もできます。';
  renderPlay();
 }
 function drawTile(){
@@ -308,9 +362,10 @@ function discardTile(i){
  renderPlay();
 }
 function playReveal(correct){
- const y=[...sc.yaku];if(riichi)y.unshift('リーチ');
+ const a=playAnswerData();
  const r=$('playResult');r.className='result show '+(correct?'correct':'wrong');
- r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${y.join('・')}</b><br>${sc.han+(riichi?1:0)}翻 ${sc.fu}符　<b>${sc.points}</b><br>${sc.note}`;
+ const doraNote=a.doraCount?`ドラ表示は${labels[sc.dora]}、ドラは${labels[doraFromIndicator(sc.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}`;
 }
 function requestNewRound(){
  if(sc&&!finished&&(turn>0||discards.length>0)){
@@ -378,11 +433,91 @@ $('riichiBtn').onclick=()=>{
  renderPlay();
 };
 $('tsumoBtn').onclick=declareTsumo;
+
+function spokenNumberToDigits(text){
+ const simple={
+  '一万六千':'16000','一万二千':'12000','四万八千':'48000','三万二千':'32000',
+  '二万四千':'24000','一万':'10000','九千':'9000','八千':'8000','七千':'7000',
+  '六千':'6000','五千':'5000','四千':'4000','三千':'3000','二千':'2000','千':'1000'
+ };
+ let out=text;
+ Object.entries(simple).forEach(([k,v])=>{out=out.replaceAll(k,v)});
+ return out;
+}
+function splitSpokenAnswer(raw){
+ let text=spokenNumberToDigits(raw)
+   .replace(/[，,]/g,'')
+   .replace(/点/g,'')
+   .replace(/\s+/g,' ')
+   .trim();
+
+ const pointMatches=[...text.matchAll(/(?:^|[\s、。・])(\d{3,5})(?=$|[\s、。・]|オール)/g)].map(m=>m[1]);
+ let points='';
+ if(/オール/.test(text)&&pointMatches.length){
+   points=`${pointMatches[pointMatches.length-1]}オール`;
+ }else if(pointMatches.length>=2){
+   points=`${pointMatches[pointMatches.length-2]}/${pointMatches[pointMatches.length-1]}`;
+ }else if(pointMatches.length===1){
+   points=pointMatches[0];
+ }
+
+ let yaku=text
+   .replace(/\d{3,5}\s*オール/g,'')
+   .replace(/(?:^|[\s、。・])\d{3,5}(?=$|[\s、。・])/g,' ')
+   .replace(/オール/g,'')
+   .replace(/[。]/g,'')
+   .replace(/[\s、]+/g,'・')
+   .replace(/・+/g,'・')
+   .replace(/^・|・$/g,'');
+
+ return {yaku,points};
+}
+function startVoiceAnswer(yakuId,pointsId,statusId,buttonId){
+ const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const status=$(statusId),button=$(buttonId);
+ if(!Recognition){
+   status.className='voice-status error';
+   status.textContent='このブラウザでは直接の音声認識が使えません。入力欄を選び、MacやiPhoneの音声入力をご利用ください。';
+   return;
+ }
+ const recognition=new Recognition();
+ recognition.lang='ja-JP';
+ recognition.interimResults=false;
+ recognition.continuous=false;
+
+ recognition.onstart=()=>{
+   status.className='voice-status listening';
+   status.textContent='聞いています…役と点数を続けて話してください。';
+   button.classList.add('mic-listening');
+ };
+ recognition.onresult=e=>{
+   const transcript=e.results[0][0].transcript;
+   const parsed=splitSpokenAnswer(transcript);
+   $(yakuId).value=parsed.yaku;
+   $(pointsId).value=parsed.points;
+   status.className='voice-status';
+   status.textContent=`聞き取り：${transcript}`;
+ };
+ recognition.onerror=e=>{
+   status.className='voice-status error';
+   status.textContent=e.error==='not-allowed'
+     ? 'マイクが許可されていません。Chromeのマイク使用を許可してください。'
+     : 'うまく聞き取れませんでした。もう一度、ゆっくり話してください。';
+ };
+ recognition.onend=()=>button.classList.remove('mic-listening');
+
+ try{recognition.start()}
+ catch(_){
+   status.className='voice-status error';
+   status.textContent='マイクを開始できませんでした。少し待ってから、もう一度押してください。';
+ }
+}
+$('playMic').onclick=()=>startVoiceAnswer('playYaku','playPoints','playVoiceStatus','playMic');
 $('playShow').onclick=()=>playReveal(false);
 $('playCheck').onclick=()=>{
  const y=norm($('playYaku').value),p=norm($('playPoints').value);
- const needed=[...sc.yaku];if(riichi)needed.push('リーチ');
- playReveal(needed.every(v=>y.includes(norm(v)))&&p===norm(sc.points));
+ const a=playAnswerData();
+ playReveal(a.yaku.every(v=>y.includes(norm(v)))&&p===norm(a.points));
 };
 
 let quizIndex=0,quizCorrect=0,quizStreak=0;
@@ -396,19 +531,23 @@ function loadQuiz(){
  });
  $('quizNo').textContent=quizIndex+1;$('quizCorrect').textContent=quizCorrect;$('quizStreak').textContent=quizStreak;
  $('quizDealer').textContent=q.dealer;$('quizWinType').textContent='ツモ';
- $('quizYaku').value='';$('quizPoints').value='';$('quizResult').className='result';
+ $('quizYaku').value='';$('quizPoints').value='';
+ $('quizVoiceStatus').className='voice-status';$('quizVoiceStatus').textContent='役と点数を一息で話せます。手入力もできます。';
+ $('quizResult').className='result';
 }
 function quizReveal(correct){
- const q=scenarios[quizIndex%scenarios.length],r=$('quizResult');
+ const q=scenarios[quizIndex%scenarios.length],a=scenarioAnswerData(q),r=$('quizResult');
  r.className='result show '+(correct?'correct':'wrong');
- r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${q.yaku.join('・')}</b><br>${q.han}翻 ${q.fu}符　<b>${q.points}</b><br>${q.note}`;
+ const doraNote=a.doraCount?`ドラ表示は${labels[q.dora]}、ドラは${labels[doraFromIndicator(q.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}`;
 }
 $('quizCheck').onclick=()=>{
- const q=scenarios[quizIndex%scenarios.length],y=norm($('quizYaku').value),p=norm($('quizPoints').value);
- const ok=q.yaku.every(v=>y.includes(norm(v)))&&p===norm(q.points);
+ const q=scenarios[quizIndex%scenarios.length],a=scenarioAnswerData(q),y=norm($('quizYaku').value),p=norm($('quizPoints').value);
+ const ok=a.yaku.every(v=>y.includes(norm(v)))&&p===norm(a.points);
  if(ok){quizCorrect++;quizStreak++;}else quizStreak=0;
  $('quizCorrect').textContent=quizCorrect;$('quizStreak').textContent=quizStreak;quizReveal(ok);
 };
+$('quizMic').onclick=()=>startVoiceAnswer('quizYaku','quizPoints','quizVoiceStatus','quizMic');
 $('quizShow').onclick=()=>quizReveal(false);
 $('quizNext').onclick=()=>{quizIndex++;loadQuiz()};
 
