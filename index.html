@@ -1,363 +1,79 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>花雀LAB ～詰め麻雀研究所～</title>
-  <style>
-    :root {
-      --bg:#fffafc;
-      --panel:#ffffff;
-      --text:#2b2b2b;
-      --muted:#6f6f6f;
-      --accent:#d94b79;
-      --accent-soft:#fde8ef;
-      --border:#e7d9df;
-      --green:#2d7b55;
-    }
-    * { box-sizing:border-box; }
-    body {
-      margin:0;
-      font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-      background:var(--bg);
-      color:var(--text);
-    }
-    main {
-      width:min(980px, 100%);
-      margin:0 auto;
-      padding:20px 14px 40px;
-    }
-    header {
-      text-align:center;
-      padding:18px 8px 10px;
-    }
-    h1 { margin:0; font-size:clamp(28px,5vw,46px); }
-    .subtitle { margin:8px 0 0; font-size:clamp(16px,3vw,22px); color:var(--muted); }
-    .panel {
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:18px;
-      padding:16px;
-      margin-top:16px;
-      box-shadow:0 5px 18px rgba(70,30,45,.06);
-    }
-    .stats {
-      display:grid;
-      grid-template-columns:repeat(3,1fr);
-      gap:10px;
-    }
-    .stat {
-      background:var(--accent-soft);
-      border-radius:14px;
-      padding:12px;
-      text-align:center;
-    }
-    .stat b { display:block; font-size:24px; margin-top:3px; }
-    .message {
-      margin:14px 0 0;
-      padding:12px;
-      border-radius:12px;
-      background:#f7f7f7;
-      min-height:48px;
-      font-size:17px;
-    }
-    .hand-title {
-      display:flex;
-      align-items:end;
-      justify-content:space-between;
-      gap:12px;
-      margin:4px 0 10px;
-    }
-    .hand-title h2 { margin:0; font-size:20px; }
-    .hint { color:var(--muted); font-size:13px; }
-    #hand {
-      display:flex;
-      flex-wrap:wrap;
-      gap:7px;
-      align-items:flex-end;
-      min-height:92px;
-    }
-    .tile {
-      width:58px;
-      min-height:82px;
-      border:1px solid #bbb;
-      border-radius:8px;
-      background:linear-gradient(#fff,#f7f3eb);
-      box-shadow:0 3px 0 #d8d1c4;
-      padding:4px 3px 5px;
-      color:#111;
-      cursor:pointer;
-    }
-    .tile:disabled { cursor:default; opacity:1; }
-    .tile.drawn { outline:3px solid var(--accent); transform:translateY(-5px); }
-    .glyph { display:block; font-size:38px; line-height:1.05; }
-    .label { display:block; font-size:12px; margin-top:2px; color:#333; }
-    .controls {
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top:16px;
-    }
-    button.control {
-      border:1px solid var(--border);
-      border-radius:12px;
-      background:white;
-      padding:11px 16px;
-      font-size:16px;
-      cursor:pointer;
-    }
-    button.primary {
-      background:var(--accent);
-      color:white;
-      border-color:var(--accent);
-      font-weight:700;
-    }
-    button.control:disabled { opacity:.45; cursor:not-allowed; }
-    .answer-grid {
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:12px;
-      margin-top:10px;
-    }
-    label { font-size:14px; }
-    input {
-      width:100%;
-      margin-top:5px;
-      padding:11px;
-      border:1px solid var(--border);
-      border-radius:10px;
-      font-size:16px;
-    }
-    .record {
-      margin-top:10px;
-      font-weight:700;
-      color:var(--green);
-      min-height:24px;
-    }
-    footer {
-      text-align:center;
-      color:var(--muted);
-      font-size:13px;
-      margin-top:18px;
-    }
-    @media (max-width:600px) {
-      .tile { width:48px; min-height:72px; }
-      .glyph { font-size:32px; }
-      .label { font-size:11px; }
-      .answer-grid { grid-template-columns:1fr; }
-      .stats { grid-template-columns:repeat(3,1fr); }
-      .stat b { font-size:20px; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>花雀LAB｜麻雀点数計算自主練</title>
+<style>
+:root{--bg:#fff8fb;--panel:#fff;--ink:#2c2630;--muted:#766b73;--pink:#d94b79;--soft:#fde7ef;--line:#ead8df;--green:#22734d;--red:#b52d42;--gold:#8a6612}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;background:var(--bg);color:var(--ink)}
+main{width:min(980px,100%);margin:auto;padding:14px 12px 42px} header{text-align:center;padding:12px 6px} h1{margin:0;font-size:clamp(30px,7vw,50px)} .sub{margin:4px 0;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:15px;margin-top:13px;box-shadow:0 5px 16px rgba(70,30,45,.06)}
+.stats,.context{display:grid;gap:8px}.stats{grid-template-columns:repeat(3,1fr)}.context{grid-template-columns:repeat(5,1fr);margin-top:10px}.box{background:var(--soft);border-radius:13px;padding:9px;text-align:center;font-size:13px}.box b{display:block;font-size:19px;margin-top:2px}
+.message{margin-top:11px;padding:12px;border-radius:12px;background:#f7f5f6;font-size:17px;font-weight:700;text-align:center}
+.hand-title{display:flex;align-items:end;justify-content:space-between;gap:10px}.hand-title h2{margin:0}.hint{font-size:13px;color:var(--muted)}
+.hand{display:flex;flex-wrap:nowrap;gap:4px;align-items:flex-end;overflow-x:auto;padding:12px 2px 7px;-webkit-overflow-scrolling:touch}.tile{flex:0 0 54px;height:76px;border:1px solid #bcb5ad;border-radius:7px;background:linear-gradient(#fff,#f4efe5);box-shadow:0 3px 0 #d2c9ba;text-align:center;padding:3px}.tile.win{margin-left:10px;outline:3px solid var(--pink);transform:translateY(-4px)}.glyph{display:block;font-size:36px;line-height:1.1}.label{font-size:11px}.win-caption{text-align:right;color:var(--pink);font-weight:700;font-size:13px;margin-top:2px}
+.answer-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:10px}label{font-size:14px;font-weight:700}input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:11px;padding:12px;font-size:17px;background:white}.controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:13px}button{border:1px solid var(--line);border-radius:12px;background:white;padding:11px 15px;font-size:16px;cursor:pointer}button.primary{background:var(--pink);border-color:var(--pink);color:#fff;font-weight:800}button.good{background:var(--green);border-color:var(--green);color:#fff;font-weight:800}button:disabled{opacity:.45;cursor:not-allowed}
+.result{display:none;margin-top:13px;border-radius:14px;padding:14px}.result.show{display:block}.result.correct{background:#e9f7ef;color:var(--green)}.result.wrong{background:#fff0f2;color:var(--red)}.result h3{margin:0 0 6px}.detail{color:var(--ink);line-height:1.65}.small{font-size:13px;color:var(--muted)}.dora-tile{font-size:25px;line-height:1}
+.voice-note{font-size:12px;color:var(--muted);margin-top:7px}footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
+@media(max-width:680px){main{padding:8px 8px 30px}.panel{padding:12px}.context{grid-template-columns:repeat(3,1fr)}.tile{flex-basis:43px;height:65px}.glyph{font-size:30px}.label{font-size:10px}.answer-grid{grid-template-columns:1fr}.stats .box b{font-size:18px}.context .box b{font-size:16px}}
+</style>
 </head>
-<body>
-<main>
-  <header>
-    <h1>🌸 花雀LAB</h1>
-    <p class="subtitle">～詰め麻雀研究所～</p>
-  </header>
-
-  <section class="panel">
-    <div class="stats">
-      <div class="stat">巡目<b id="turn">0</b></div>
-      <div class="stat">山の残り<b id="wallCount">30</b></div>
-      <div class="stat">状態<b id="status">開始前</b></div>
-    </div>
-    <div id="message" class="message" aria-live="polite">「新しい練習」を押してください。</div>
-  </section>
-
-  <section class="panel">
-    <div class="hand-title">
-      <h2>一人ツモ練習</h2>
-      <div class="hint">ツモ後、切りたい牌をクリックします</div>
-    </div>
-    <div id="hand" aria-label="手牌"></div>
-
-    <div class="controls">
-      <button id="newGame" class="control primary" type="button">新しい練習</button>
-      <button id="drawBtn" class="control" type="button" disabled>1枚ツモる</button>
-      <button id="sortBtn" class="control" type="button">並べ替え</button>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2 style="margin-top:0">和了したら、声に出して答える</h2>
-    <p class="hint">例：「リーチ、タンヤオ、ドラ1、5200点！」</p>
-    <div class="answer-grid">
-      <label>役
-        <input id="yakuInput" placeholder="リーチ・タンヤオなど">
-      </label>
-      <label>点数
-        <input id="pointsInput" inputmode="numeric" placeholder="5200">
-      </label>
-    </div>
-    <div class="controls">
-      <button id="recordBtn" class="control" type="button">今回の答えを記録</button>
-    </div>
-    <div id="record" class="record" aria-live="polite"></div>
-  </section>
-
-  <footer>まずはVer.1。毎日10分、楽しく自主練。</footer>
+<body><main>
+<header><h1>🌸 花雀LAB</h1><p class="sub">麻雀点数計算・声に出して自主練</p></header>
+<section class="panel">
+ <div class="stats"><div class="box">問題<b id="qno">1</b></div><div class="box">正解<b id="correct">0</b></div><div class="box">連続正解<b id="streak">0</b></div></div>
+ <div class="context">
+  <div class="box">場風<b id="roundWind">東</b></div><div class="box">自風<b id="seatWind">南</b></div><div class="box">親・子<b id="dealer">子</b></div><div class="box">和了<b id="winType">ロン</b></div><div class="box">ドラ表示<b id="dora" class="dora-tile">🀉</b></div>
+ </div>
+ <div id="message" class="message">役と点数を、まず声に出して答えましょう。</div>
+</section>
+<section class="panel">
+ <div class="hand-title"><h2>今回の手牌</h2><div class="hint">右端の浮いた牌が和了牌です</div></div>
+ <div id="hand" class="hand" aria-label="手牌"></div><div class="win-caption">← 和了牌</div>
+</section>
+<section class="panel">
+ <h2 style="margin-top:0">あなたの答え</h2>
+ <p class="hint">例：「リーチ、タンヤオ、ドラ1。5200点！」</p>
+ <div class="answer-grid">
+  <label>役<input id="yakuInput" placeholder="リーチ・タンヤオ・ドラ1"></label>
+  <label>点数<input id="pointsInput" placeholder="5200 または 1000/2000" inputmode="numeric"></label>
+ </div>
+ <div class="controls">
+  <button id="voiceBtn" type="button">🎤 声で入力</button>
+  <button id="checkBtn" class="good" type="button">答え合わせ</button>
+  <button id="showBtn" type="button">正解を見る</button>
+  <button id="nextBtn" class="primary" type="button">次の問題</button>
+ </div>
+ <div class="voice-note">音声入力は対応ブラウザだけで使えます。使えない場合は、声に出してから文字を入力してください。</div>
+ <div id="result" class="result" aria-live="polite"></div>
+</section>
+<footer>毎日10分。間違えても大丈夫、答えるほど強くなる。</footer>
 </main>
-
 <script>
-const labels = [
-  '1萬','2萬','3萬','4萬','5萬','6萬','7萬','8萬','9萬',
-  '1筒','2筒','3筒','4筒','5筒','6筒','7筒','8筒','9筒',
-  '1索','2索','3索','4索','5索','6索','7索','8索','9索',
-  '東','南','西','北','白','發','中'
+const labels=['1萬','2萬','3萬','4萬','5萬','6萬','7萬','8萬','9萬','1筒','2筒','3筒','4筒','5筒','6筒','7筒','8筒','9筒','1索','2索','3索','4索','5索','6索','7索','8索','9索','東','南','西','北','白','發','中'];
+const glyphs=['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏','🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡','🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘','🀀','🀁','🀂','🀃','🀆','🀅','🀄'];
+const T={m:n=>n-1,p:n=>9+n-1,s:n=>18+n-1,E:27,S:28,W:29,N:30,H:31,F:32,C:33};
+const problems=[
+ {round:'東',seat:'南',dealer:'子',type:'ロン',dora:T.m(3),hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(3),T.s(6),T.s(7),T.s(8),T.p(5),T.p(5)],win:T.p(4),yaku:['リーチ','ピンフ'],han:2,fu:30,points:'2000',note:'面前ロン10符を含む30符。リーチ＋ピンフで2翻です。'},
+ {round:'東',seat:'南',dealer:'子',type:'ツモ',dora:T.s(4),hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(4),T.s(7),T.s(8),T.s(9),T.E,T.E],win:T.p(3),yaku:['ツモ'],han:1,fu:30,points:'300/500',note:'カンチャン待ちでピンフではありません。門前ツモのみ、子の300・500です。'},
+ {round:'南',seat:'西',dealer:'子',type:'ツモ',dora:T.p(8),hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(4),T.s(7),T.s(8),T.s(9),T.N,T.N],win:T.p(3),yaku:['リーチ','ツモ'],han:2,fu:30,points:'500/1000',note:'リーチ＋門前ツモで2翻。30符の子は500・1000です。'},
+ {round:'東',seat:'西',dealer:'子',type:'ロン',dora:T.m(3),hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(6),T.p(7),T.p(8),T.s(7),T.s(7),T.p(5),T.p(5)],win:T.s(7),yaku:['リーチ','タンヤオ','ドラ1'],han:3,fu:40,points:'5200',note:'中張牌の暗刻ができ、面前ロンを加えて40符。3翻40符で5200点です。'},
+ {round:'南',seat:'東',dealer:'親',type:'ロン',dora:T.s(9),hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(4),T.s(7),T.s(8),T.s(9),T.N,T.N],win:T.p(3),yaku:['リーチ'],han:1,fu:40,points:'2000',note:'カンチャン待ちでピンフなし。親の1翻40符は2000点です。'},
+ {round:'東',seat:'北',dealer:'子',type:'ロン',dora:T.s(9),hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.s(4),T.s(5),T.s(6),T.p(6),T.p(6)],win:T.p(5),yaku:['リーチ','タンヤオ','ピンフ'],han:3,fu:30,points:'3900',note:'メンタンピン。3翻30符の子のロンは3900点です。'},
+ {round:'南',seat:'西',dealer:'子',type:'ツモ',dora:T.m(8),hand:[T.m(2),T.m(3),T.m(4),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.m(6),T.m(7),T.p(5),T.p(5)],win:T.m(8),yaku:['リーチ','ツモ','タンヤオ','三色同順'],han:5,fu:20,points:'2000/4000',note:'リーチ・ツモ・タンヤオ・三色同順で5翻。満貫なので2000・4000です。'},
+ {round:'東',seat:'南',dealer:'子',type:'ツモ',dora:T.p(4),hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(4),T.s(7),T.s(8),T.s(9),T.N,T.N],win:T.p(3),yaku:['リーチ','ツモ','ドラ1'],han:3,fu:30,points:'1000/2000',note:'リーチ・ツモ・ドラ1で3翻30符。子の1000・2000です。'}
 ];
-const glyphs = [
-  '🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏',
-  '🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡',
-  '🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘',
-  '🀀','🀁','🀂','🀃','🀆','🀅','🀄'
-];
-
-let hand = [], wall = [], turn = 0, awaitingDiscard = false, drawnIndex = -1, finished = false;
-
-const handEl = document.getElementById('hand');
-const msgEl = document.getElementById('message');
-const turnEl = document.getElementById('turn');
-const wallCountEl = document.getElementById('wallCount');
-const statusEl = document.getElementById('status');
-const drawBtn = document.getElementById('drawBtn');
-
-function makeTiles() {
-  const all = [];
-  for (let i=0;i<34;i++) for (let j=0;j<4;j++) all.push(i);
-  return all;
-}
-function shuffle(a) {
-  for (let i=a.length-1;i>0;i--) {
-    const j = Math.floor(Math.random()*(i+1));
-    [a[i],a[j]]=[a[j],a[i]];
-  }
-  return a;
-}
-function sortHandOnly() {
-  hand.sort((a,b)=>a-b);
-  drawnIndex = -1;
-  render();
-}
-function render() {
-  handEl.innerHTML='';
-  hand.forEach((tile,index)=>{
-    const b=document.createElement('button');
-    b.type='button';
-    b.className='tile'+(index===drawnIndex && awaitingDiscard ? ' drawn':'');
-    b.disabled=!awaitingDiscard || finished;
-    b.innerHTML=`<span class="glyph">${glyphs[tile]}</span><span class="label">${labels[tile]}</span>`;
-    b.setAttribute('aria-label', labels[tile]+'を切る');
-    b.addEventListener('click',()=>discard(index));
-    handEl.appendChild(b);
-  });
-  turnEl.textContent=turn;
-  wallCountEl.textContent=wall.length;
-  drawBtn.disabled=awaitingDiscard || finished || wall.length===0 || hand.length!==13;
-}
-function newGame() {
-  const tiles=shuffle(makeTiles());
-  hand=tiles.splice(0,13);
-  wall=tiles.splice(0,30);
-  turn=0; awaitingDiscard=false; drawnIndex=-1; finished=false;
-  hand.sort((a,b)=>a-b);
-  statusEl.textContent='練習中';
-  msgEl.textContent='13枚を配りました。「1枚ツモる」を押してください。';
-  document.getElementById('record').textContent='';
-  render();
-}
-function drawTile() {
-  if (awaitingDiscard || finished || wall.length===0) return;
-  hand.push(wall.shift());
-  drawnIndex=hand.length-1;
-  awaitingDiscard=true;
-  turn++;
-  if (isWinningHand(hand)) {
-    finished=true;
-    statusEl.textContent='和了！';
-    msgEl.textContent='和了形です！ 役と点数を声に出してください。';
-  } else {
-    msgEl.textContent=labels[hand[drawnIndex]]+'をツモりました。切る牌を1枚クリックしてください。';
-  }
-  render();
-}
-function discard(index) {
-  if (!awaitingDiscard || finished) return;
-  const removed=hand.splice(index,1)[0];
-  awaitingDiscard=false;
-  drawnIndex=-1;
-  hand.sort((a,b)=>a-b);
-  msgEl.textContent=labels[removed]+'を切りました。次をツモってください。';
-  if (wall.length===0) {
-    finished=true;
-    statusEl.textContent='流局';
-    msgEl.textContent='山がなくなりました。もう一度挑戦しましょう。';
-  }
-  render();
-}
-function countsOf(tiles) {
-  const c=Array(34).fill(0);
-  tiles.forEach(t=>c[t]++);
-  return c;
-}
-function isWinningHand(tiles) {
-  if (tiles.length!==14) return false;
-  const c=countsOf(tiles);
-  return isKokushi(c)||isChiitoi(c)||isStandard(c);
-}
-function isChiitoi(c) {
-  return c.filter(n=>n===2).length===7;
-}
-function isKokushi(c) {
-  const terminals=[0,8,9,17,18,26,27,28,29,30,31,32,33];
-  let pair=false;
-  for (const i of terminals) {
-    if (c[i]===0) return false;
-    if (c[i]>=2) pair=true;
-  }
-  return pair && c.reduce((a,b)=>a+b,0)===14;
-}
-function isStandard(c) {
-  for (let i=0;i<34;i++) {
-    if (c[i]>=2) {
-      c[i]-=2;
-      if (canMakeMelds(c)) { c[i]+=2; return true; }
-      c[i]+=2;
-    }
-  }
-  return false;
-}
-function canMakeMelds(c) {
-  const i=c.findIndex(n=>n>0);
-  if (i===-1) return true;
-  if (c[i]>=3) {
-    c[i]-=3;
-    if (canMakeMelds(c)) { c[i]+=3; return true; }
-    c[i]+=3;
-  }
-  if (i<27) {
-    const p=i%9;
-    if (p<=6 && c[i+1]>0 && c[i+2]>0) {
-      c[i]--; c[i+1]--; c[i+2]--;
-      if (canMakeMelds(c)) { c[i]++; c[i+1]++; c[i+2]++; return true; }
-      c[i]++; c[i+1]++; c[i+2]++;
-    }
-  }
-  return false;
-}
-
-document.getElementById('newGame').addEventListener('click',newGame);
-drawBtn.addEventListener('click',drawTile);
-document.getElementById('sortBtn').addEventListener('click',sortHandOnly);
-document.getElementById('recordBtn').addEventListener('click',()=>{
-  const y=document.getElementById('yakuInput').value.trim();
-  const p=document.getElementById('pointsInput').value.trim();
-  document.getElementById('record').textContent =
-    (!y && !p) ? '役か点数を入力してください。' :
-    `記録：${y || '役未入力'}／${p ? p+'点' : '点数未入力'}`;
-});
-render();
-</script>
-</body>
-</html>
+let order=[],pos=0,correct=0,streak=0,answered=false;
+const $=id=>document.getElementById(id);
+function normalize(s){return String(s).toLowerCase().replace(/[\s,，、・点円]/g,'').replace(/／/g,'/').replace(/ピンフ/g,'平和').replace(/ツモ/g,'自摸').replace(/三色同順/g,'三色').replace(/ドラ一/g,'ドラ1');}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function current(){return problems[order[pos]]}
+function renderTile(t,win=false){return `<div class="tile${win?' win':''}"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`}
+function loadProblem(){if(!order.length||pos>=order.length){order=shuffle([...problems.keys()]);pos=0}const p=current();answered=false;$('qno').textContent=String((Number($('qno').textContent)||0)+1);$('roundWind').textContent=p.round;$('seatWind').textContent=p.seat;$('dealer').textContent=p.dealer;$('winType').textContent=p.type;$('dora').textContent=glyphs[p.dora];$('hand').innerHTML=p.hand.map(t=>renderTile(t)).join('')+renderTile(p.win,true);$('yakuInput').value='';$('pointsInput').value='';$('result').className='result';$('result').innerHTML='';$('message').textContent='役と点数を、まず声に出して答えましょう。';}
+function reveal(mark){const p=current();const r=$('result');r.className='result show '+mark;r.innerHTML=`<h3>${mark==='correct'?'🎉 正解！':'📖 正解はこちら'}</h3><div class="detail"><b>${p.yaku.join('・')}</b><br>${p.han}翻 ${p.fu}符　<b>${p.points}</b><br>${p.note}</div>`;answered=true}
+function check(){const p=current();const enteredPoints=normalize($('pointsInput').value);if(!enteredPoints){$('result').className='result show wrong';$('result').innerHTML='<h3>点数を入力してください</h3>';return}const pointOK=enteredPoints===normalize(p.points);const y=normalize($('yakuInput').value);const yakuOK=p.yaku.every(v=>y.includes(normalize(v).replace('同順',''))||normalize(v)==='ドラ1'&&y.includes('ドラ1'));if(pointOK&&yakuOK){correct++;streak++;$('correct').textContent=correct;$('streak').textContent=streak;reveal('correct')}else{streak=0;$('streak').textContent=streak;reveal('wrong');$('result').querySelector('h3').textContent='😅 惜しい！ 正解はこちら'} }
+$('checkBtn').onclick=check;$('showBtn').onclick=()=>{streak=0;$('streak').textContent=0;reveal('wrong')};$('nextBtn').onclick=()=>{pos++;loadProblem()};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){$('voiceBtn').disabled=true;$('voiceBtn').textContent='🎤 音声入力は未対応'}else{$('voiceBtn').onclick=()=>{const rec=new SR();rec.lang='ja-JP';rec.interimResults=false;$('message').textContent='聞いています。役と点数を話してください。';rec.onresult=e=>{const text=e.results[0][0].transcript;$('yakuInput').value=text;const m=text.match(/(\d[\d,]*(?:\s*[・\/、]\s*\d[\d,]*)?)/);if(m)$('pointsInput').value=m[1].replace(/[・、]/g,'/').replace(/,/g,'');$('message').textContent='聞き取りました。内容を確認して「答え合わせ」を押してください。'};rec.onerror=()=>$('message').textContent='うまく聞き取れませんでした。文字で入力してください。';rec.start()}}
+$('qno').textContent='0';order=shuffle([...problems.keys()]);loadProblem();
+</script></body></html>
