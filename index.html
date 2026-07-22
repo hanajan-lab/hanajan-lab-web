@@ -105,12 +105,13 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <button id="drawBtn" class="blue" disabled>1枚ツモる</button>
     <button id="sortBtn">並べ替え</button>
     <button id="riichiBtn" class="warn" disabled>リーチ宣言</button>
+    <button id="tsumoBtn" class="good" disabled>ツモ！</button>
   </div>
 </section>
 
 <section class="panel">
   <h2>手牌</h2>
-  <p class="note">ツモったら、切りたい牌をクリックします。赤い枠がツモ牌です。捨てた後も手牌は濃く表示されます。</p>
+  <p class="note">ツモったら、まず自分で和了かを確認します。和了なら「ツモ！」、違えば切る牌をクリックします。赤い枠がツモ牌です。</p>
   <div id="playHand"></div>
 </section>
 
@@ -161,7 +162,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
   <span class="badge">現在の範囲</span>
   <p class="note">
     この版は、点数計算の自主練を目的にした一人用です。ツモと打牌を繰り返し、
-    あらかじめ用意された和了形に到達します。対戦相手の思考、鳴き、放銃、局進行までを再現する
+    あらかじめ用意された和了形に自分で気づき、「ツモ！」を宣言します。対戦相手の思考、鳴き、放銃、局進行までを再現する
     四人対戦ゲームではありません。
   </p>
 </section>
@@ -185,7 +186,7 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],discards=[],drawnIndex=-1,awaitingDiscard=false,finished=false,turn=0,riichi=false;
+let sc=null,hand=[],wall=[],discards=[],drawnIndex=-1,currentDraw=null,awaitingDiscard=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
 
 function renderTile(t,i,clickable){
  const b=document.createElement('button');
@@ -198,11 +199,15 @@ function renderTile(t,i,clickable){
 }
 function renderPlay(){
  $('playHand').innerHTML='';
- hand.forEach((t,i)=>$('playHand').appendChild(renderTile(t,i,awaitingDiscard&&!finished)));
+ hand.forEach((t,i)=>{
+   const canDiscard=awaitingDiscard&&!finished&&(!riichi||riichiJustDeclared||i===drawnIndex);
+   $('playHand').appendChild(renderTile(t,i,canDiscard));
+ });
  $('discards').innerHTML=discards.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
  $('drawBtn').disabled=!sc||awaitingDiscard||finished||wall.length===0;
- $('riichiBtn').disabled=!sc||finished||riichi;
+ $('riichiBtn').disabled=!sc||!awaitingDiscard||finished||riichi;
+ $('tsumoBtn').disabled=!sc||!awaitingDiscard||finished;
  $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
 }
 function startRound(){
@@ -211,7 +216,7 @@ function startRound(){
  const junk=[T.H,T.F,T.C,T.W,T.N,T.m(9),T.p(1),T.s(1),T.m(1),T.p(9),T.s(9),T.S];
  wall=shuffle([...junk]).slice(0,7);
  wall.splice(2+Math.floor(Math.random()*3),0,sc.win);
- discards=[];drawnIndex=-1;awaitingDiscard=false;finished=false;turn=0;riichi=false;
+ discards=[];drawnIndex=-1;currentDraw=null;awaitingDiscard=false;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。「1枚ツモる」を押してください。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
@@ -220,20 +225,15 @@ function startRound(){
 }
 function drawTile(){
  if(!sc||awaitingDiscard||finished||wall.length===0)return;
- const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;awaitingDiscard=true;turn++;
- if(t===sc.win){
-   finished=true;$('playMessage').className='message win';
-   $('playMessage').textContent=`${labels[t]}をツモ！ 役と点数を声に出してください。`;
-   $('playAnswerPanel').classList.remove('hidden');
- }else{
-   $('playMessage').textContent=`${labels[t]}をツモりました。切る牌を1枚クリックしてください。`;
- }
+ const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;currentDraw=t;awaitingDiscard=true;turn++;riichiJustDeclared=false;
+ $('playMessage').className='message';
+ $('playMessage').textContent=`${labels[t]}をツモりました。和了なら「ツモ！」、違えば切る牌を選んでください。`;
  renderPlay();
 }
 function discardTile(i){
  if(!awaitingDiscard||finished)return;
  const t=hand.splice(i,1)[0];discards.push(t);hand.sort((a,b)=>a-b);
- drawnIndex=-1;awaitingDiscard=false;
+ drawnIndex=-1;currentDraw=null;awaitingDiscard=false;riichiJustDeclared=false;
  $('playMessage').textContent=`${labels[t]}を切りました。次をツモってください。`;
  if(wall.length===0){finished=true;$('playMessage').textContent='流局です。「新しい一局」で再挑戦しましょう。'}
  renderPlay();
@@ -243,9 +243,37 @@ function playReveal(correct){
  const r=$('playResult');r.className='result show '+(correct?'correct':'wrong');
  r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${y.join('・')}</b><br>${sc.han+(riichi?1:0)}翻 ${sc.fu}符　<b>${sc.points}</b><br>${sc.note}`;
 }
-$('newRoundBtn').onclick=startRound;$('playNext').onclick=startRound;$('drawBtn').onclick=drawTile;
-$('sortBtn').onclick=()=>{hand.sort((a,b)=>a-b);drawnIndex=-1;renderPlay()};
-$('riichiBtn').onclick=()=>{riichi=true;$('playMessage').textContent='リーチを宣言しました！';renderPlay()};
+function requestNewRound(){
+ if(sc&&!finished&&(turn>0||discards.length>0)){
+   if(!confirm('現在の一局を終了して、新しい一局を始めますか？'))return;
+ }
+ startRound();
+}
+function declareTsumo(){
+ if(!sc||!awaitingDiscard||finished)return;
+ if(currentDraw===sc.win){
+   finished=true;awaitingDiscard=false;
+   $('playMessage').className='message win';
+   $('playMessage').textContent='ツモ宣言！ 役と点数を声に出してから入力してください。';
+   $('playAnswerPanel').classList.remove('hidden');
+ }else{
+   $('playMessage').className='message';
+   $('playMessage').textContent='まだ和了形ではありません。手牌を見直し、1枚切って続けましょう。';
+ }
+ renderPlay();
+}
+$('newRoundBtn').onclick=requestNewRound;$('playNext').onclick=startRound;$('drawBtn').onclick=drawTile;
+$('sortBtn').onclick=()=>{
+ hand.sort((a,b)=>a-b);
+ drawnIndex=currentDraw===null?-1:hand.lastIndexOf(currentDraw);
+ renderPlay();
+};
+$('riichiBtn').onclick=()=>{
+ riichi=true;riichiJustDeclared=true;
+ $('playMessage').textContent='リーチを宣言しました。リーチ牌を1枚切ってください。';
+ renderPlay();
+};
+$('tsumoBtn').onclick=declareTsumo;
 $('playShow').onclick=()=>playReveal(false);
 $('playCheck').onclick=()=>{
  const y=norm($('playYaku').value),p=norm($('playPoints').value);
