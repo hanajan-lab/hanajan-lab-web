@@ -1,4 +1,4 @@
-<!-- Verified build: Ver.1.10.0 table layout / dealer start / correct celebration -->
+<!-- Verified build: Ver.1.11.0 riichi sideways tile / called-tile direction -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -126,7 +126,18 @@ button:disabled{opacity:.42;cursor:not-allowed}
 .river-box.me .mini{width:47px;min-height:62px}
 .river-box.me .mini .glyph{font-size:30px}
 .river-box.me .mini .label{font-size:11px}
-.melds{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}.meld{display:flex;gap:3px;padding:7px;border:2px solid var(--pink);border-radius:10px;background:var(--pink2)}
+/* リーチ宣言牌と、鳴いてもらった牌を横向きに表示します。 */
+.mini.sideways{
+  transform:rotate(90deg) scale(.82);
+  transform-origin:center;
+  position:relative;
+  z-index:2;
+}
+.discards .mini.sideways{margin:0 2px}
+.melds{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.meld{display:flex;align-items:center;gap:3px;padding:7px;border:2px solid var(--pink);border-radius:10px;background:var(--pink2)}
+.meld .mini.sideways{margin:0 7px}
+.meld-from{font-size:11px;color:var(--muted);font-weight:700;margin-left:4px;white-space:nowrap}
 .answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 label{font-size:14px;font-weight:700}
 input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}
@@ -161,7 +172,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.10.0　実戦配置・親開始・正解演出版</p>
+<p class="sub" style="font-weight:700">Ver.1.11.0　リーチ牌・鳴き牌の横向き表示版</p>
 </header>
 
 <section class="panel">
@@ -607,7 +618,7 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,sameTurnFuriten=false,riichiFuriten=false;
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,riichiDiscardIndex=-1,sameTurnFuriten=false,riichiFuriten=false;
 
 function clearOpponentAutoTimer(){
  if(opponentAutoTimer!==null){
@@ -702,12 +713,17 @@ function renderPlay(){
    const canDiscard=awaitingDiscard&&!finished&&(!riichi||riichiJustDeclared||i===drawnIndex);
    $('playHand').appendChild(renderTile(t,i,canDiscard));
  });
- const riverHtml=arr=>arr.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
- $('discards').innerHTML=riverHtml(discards);
+ const riverHtml=(arr,sidewaysIndex=-1)=>arr.map((t,i)=>`<div class="mini${i===sidewaysIndex?' sideways':''}"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
+ $('discards').innerHTML=riverHtml(discards,riichiDiscardIndex);
  $('kamichaDiscards').innerHTML=riverHtml(kamichaDiscards);
  $('toimenDiscards').innerHTML=riverHtml(toimenDiscards);
  $('shimochaDiscards').innerHTML=riverHtml(shimochaDiscards);
- $('openMelds').innerHTML=openMelds.map(m=>`<div class="meld">${m.tiles.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('')}</div>`).join('');
+ const calledTilePosition={上家:0,対面:1,下家:2};
+ $('openMelds').innerHTML=openMelds.map(m=>{
+   const sideways=Number.isInteger(calledTilePosition[m.from])?calledTilePosition[m.from]:-1;
+   const tiles=m.tiles.map((t,i)=>`<div class="mini${i===sideways?' sideways':''}"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
+   return `<div class="meld">${tiles}${m.from?`<span class="meld-from">${m.from}から</span>`:''}</div>`;
+ }).join('');
  $('openMeldArea').classList.toggle('hidden',openMelds.length===0);
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
  // ボタンの状態を答えのヒントにしないため、対局中は全ボタンを通常表示します。
@@ -741,7 +757,7 @@ function startRound(){
  wall.forEach(removeOne);
  opponentWall=shuffle([...pool]).slice(0,54);
  discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];openMelds=[];
- drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;sameTurnFuriten=false;riichiFuriten=false;
+ drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;riichiDiscardIndex=-1;sameTurnFuriten=false;riichiFuriten=false;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。親から対局を始めます。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
@@ -973,9 +989,11 @@ function discardTile(i){
  if(wasRiichiDeclaration){
    if(validRiichi){
      riichi=true;
+     riichiDiscardIndex=discards.length-1;
      $('playMessage').className='message win';
      $('playMessage').textContent=`${labels[t]}を切って、リーチ成立です。次をツモってください。`;
    }else{
+     riichiDiscardIndex=-1;
      $('playMessage').className='message error';
      $('playMessage').textContent=`誤リーチです。捨てた後の13枚はテンパイしていません。リーチは成立せず、このまま続けます。`;
    }
