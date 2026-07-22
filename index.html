@@ -27,6 +27,7 @@ h2{margin:0 0 10px}
 .stat b{display:block;font-size:20px;margin-top:3px}
 .message{text-align:center;font-weight:700;padding:14px;border-radius:13px;background:#faf5f7;margin-top:12px}
 .message.win{background:#e8f7ef;color:var(--green)}
+.message.error{background:#fff0f2;color:var(--red);border:2px solid #efb7c0}
 .controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
 button{border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px 16px;font-size:16px;font-weight:700;cursor:pointer}
 button:hover:not(:disabled){transform:translateY(-1px)}
@@ -104,14 +105,14 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <button id="newRoundBtn" class="primary">新しい一局</button>
     <button id="drawBtn" class="blue" disabled>1枚ツモる</button>
     <button id="sortBtn">並べ替え</button>
-    <button id="riichiBtn" class="warn" disabled>リーチ宣言</button>
-    <button id="tsumoBtn" class="good" disabled>ツモ！</button>
+    <button id="riichiBtn" class="warn">リーチ宣言</button>
+    <button id="tsumoBtn" class="good">ツモ！</button>
   </div>
 </section>
 
 <section class="panel">
   <h2>手牌</h2>
-  <p class="note">ツモったら、まず自分で和了かを確認します。和了なら「ツモ！」、違えば切る牌をクリックします。赤い枠がツモ牌です。</p>
+  <p class="note">ツモったら、自分で和了か、リーチするかを判断します。ツモなら「ツモ！」。リーチなら「リーチ宣言」を押してから、リーチ牌を1枚捨てます。ボタンの色は答えのヒントになりません。</p>
   <div id="playHand"></div>
 </section>
 
@@ -178,6 +179,7 @@ const T={m:n=>n-1,p:n=>9+n-1,s:n=>18+n-1,E:27,S:28,W:29,N:30,H:31,F:32,C:33};
 const $=id=>document.getElementById(id);
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const norm=s=>String(s).replace(/[・,、\s点]/g,'').replace(/オール/g,'all').toLowerCase();
+const sameTiles=(a,b)=>a.length===b.length&&[...a].sort((x,y)=>x-y).every((v,i)=>v===[...b].sort((x,y)=>x-y)[i]);
 
 const scenarios=[
  {hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.p(5),T.s(4),T.s(5),T.s(6),T.p(7)],win:T.p(7),round:'東',seat:'南',dealer:'子',dora:T.m(3),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'子の3翻20符ツモ。'},
@@ -206,8 +208,8 @@ function renderPlay(){
  $('discards').innerHTML=discards.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
  $('drawBtn').disabled=!sc||awaitingDiscard||finished||wall.length===0;
- $('riichiBtn').disabled=!sc||!awaitingDiscard||finished||riichi;
- $('tsumoBtn').disabled=!sc||!awaitingDiscard||finished;
+ $('riichiBtn').disabled=false;
+ $('tsumoBtn').disabled=false;
  $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
 }
 function startRound(){
@@ -233,9 +235,23 @@ function drawTile(){
 function discardTile(i){
  if(!awaitingDiscard||finished)return;
  const t=hand.splice(i,1)[0];discards.push(t);hand.sort((a,b)=>a-b);
+ const wasRiichiDeclaration=riichiJustDeclared;
+ const validRiichi=wasRiichiDeclaration&&sameTiles(hand,sc.hand);
  drawnIndex=-1;currentDraw=null;awaitingDiscard=false;riichiJustDeclared=false;
- $('playMessage').textContent=`${labels[t]}を切りました。次をツモってください。`;
- if(wall.length===0){finished=true;$('playMessage').textContent='流局です。「新しい一局」で再挑戦しましょう。'}
+ if(wasRiichiDeclaration){
+   if(validRiichi){
+     riichi=true;
+     $('playMessage').className='message win';
+     $('playMessage').textContent=`${labels[t]}を切って、リーチ成立です。次をツモってください。`;
+   }else{
+     $('playMessage').className='message error';
+     $('playMessage').textContent=`誤リーチです。その牌を切るとテンパイではありません。リーチは成立せず、このまま続けます。`;
+   }
+ }else{
+   $('playMessage').className='message';
+   $('playMessage').textContent=`${labels[t]}を切りました。次をツモってください。`;
+ }
+ if(wall.length===0){finished=true;$('playMessage').className='message';$('playMessage').textContent='流局です。「新しい一局」で再挑戦しましょう。'}
  renderPlay();
 }
 function playReveal(correct){
@@ -250,15 +266,29 @@ function requestNewRound(){
  startRound();
 }
 function declareTsumo(){
- if(!sc||!awaitingDiscard||finished)return;
+ if(!sc){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='先に「新しい一局」を押してください。';
+   return;
+ }
+ if(finished){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='この一局は終了しています。「新しい一局」を押してください。';
+   return;
+ }
+ if(!awaitingDiscard){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='誤ツモです。まだ牌をツモっていません。';
+   return;
+ }
  if(currentDraw===sc.win){
    finished=true;awaitingDiscard=false;
    $('playMessage').className='message win';
-   $('playMessage').textContent='ツモ宣言！ 役と点数を声に出してから入力してください。';
+   $('playMessage').textContent='ツモ成立！ 役と点数を声に出してから入力してください。';
    $('playAnswerPanel').classList.remove('hidden');
  }else{
-   $('playMessage').className='message';
-   $('playMessage').textContent='まだ和了形ではありません。手牌を見直し、1枚切って続けましょう。';
+   $('playMessage').className='message error';
+   $('playMessage').textContent='誤ツモです。まだ和了していません。手牌を見直して1枚切りましょう。';
  }
  renderPlay();
 }
@@ -269,8 +299,29 @@ $('sortBtn').onclick=()=>{
  renderPlay();
 };
 $('riichiBtn').onclick=()=>{
- riichi=true;riichiJustDeclared=true;
- $('playMessage').textContent='リーチを宣言しました。リーチ牌を1枚切ってください。';
+ if(!sc){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='先に「新しい一局」を押してください。';
+   return;
+ }
+ if(finished){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='この一局は終了しています。';
+   return;
+ }
+ if(riichi){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='すでにリーチを宣言しています。';
+   return;
+ }
+ if(!awaitingDiscard){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='今はリーチ宣言できません。まず1枚ツモって14枚にしてください。';
+   return;
+ }
+ riichiJustDeclared=true;
+ $('playMessage').className='message';
+ $('playMessage').textContent='「リーチ」と宣言しました。リーチ牌を1枚選んで捨ててください。';
  renderPlay();
 };
 $('tsumoBtn').onclick=declareTsumo;
