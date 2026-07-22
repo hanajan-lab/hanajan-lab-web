@@ -110,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.7　ロン練習版</p>
+<p class="sub" style="font-weight:700">Ver.1.8　ノーヒント判定版</p>
 </header>
 
 <section class="panel">
@@ -542,11 +542,13 @@ function renderPlay(){
  $('toimenDiscards').innerHTML=riverHtml(toimenDiscards);
  $('shimochaDiscards').innerHTML=riverHtml(shimochaDiscards);
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
- $('drawBtn').disabled=!sc||awaitingDiscard||opponentsActing||finished||wall.length===0;
- $('riichiBtn').disabled=opponentsActing||finished;
- $('tsumoBtn').disabled=opponentsActing||finished;
- $('ronBtn').disabled=!awaitingRonDecision||finished;
- $('passBtn').disabled=!awaitingRonDecision||finished;
+ // ボタンの状態を答えのヒントにしないため、対局中は全ボタンを通常表示します。
+ const playing=!!sc&&!finished;
+ $('drawBtn').disabled=!playing;
+ $('riichiBtn').disabled=!playing;
+ $('tsumoBtn').disabled=!playing;
+ $('ronBtn').disabled=!playing;
+ $('passBtn').disabled=!playing;
  $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
 }
 function startRound(){
@@ -579,7 +581,18 @@ function startRound(){
  renderPlay();
 }
 function drawTile(){
- if(!sc||awaitingDiscard||opponentsActing||finished||wall.length===0)return;
+ if(!sc||finished)return;
+ if(awaitingRonDecision){
+   $('playMessage').className='message';
+   $('playMessage').textContent='他家の捨て牌が出ています。自分でロンか見送りかを判断してください。';
+   return;
+ }
+ if(awaitingDiscard){
+   $('playMessage').className='message';
+   $('playMessage').textContent='先に1枚捨ててください。';
+   return;
+ }
+ if(opponentsActing||wall.length===0)return;
  const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;currentDraw=t;awaitingDiscard=true;turn++;riichiJustDeclared=false;
  $('playMessage').className='message';
  $('playMessage').textContent=`${labels[t]}をツモりました。和了なら「ツモ！」、違えば切る牌を選んでください。`;
@@ -622,13 +635,17 @@ function playOpponentTurns(){
      setTimeout(next,180);
    };
    $('playMessage').className='message';
-   $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。ロンなら「ロン！」、違えば「見送る」を押してください。`;
+   $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。手牌を見て、自分で判断してください。`;
    renderPlay();
  };
  next();
 }
 function passRon(){
- if(!awaitingRonDecision||!pendingOpponentNext)return;
+ if(!awaitingRonDecision||!pendingOpponentNext){
+   $('playMessage').className='message';
+   $('playMessage').textContent='今は見送る相手の捨て牌がありません。';
+   return;
+ }
  const go=pendingOpponentNext;
  $('playMessage').className='message';
  $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}を見送りました。`;
@@ -705,6 +722,11 @@ function requestNewRound(){
  startRound();
 }
 function declareTsumo(){
+ if(awaitingRonDecision){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='他家が捨てた牌なので、ツモではありません。';
+   return;
+ }
  if(!sc){
    $('playMessage').className='message error';
    $('playMessage').textContent='先に「新しい一局」を押してください。';
@@ -741,6 +763,11 @@ $('sortBtn').onclick=()=>{
  renderPlay();
 };
 $('riichiBtn').onclick=()=>{
+ if(awaitingRonDecision){
+   $('playMessage').className='message';
+   $('playMessage').textContent='今は他家の捨て牌に対する判断中です。';
+   return;
+ }
  if(!sc){
    $('playMessage').className='message error';
    $('playMessage').textContent='先に「新しい一局」を押してください。';
