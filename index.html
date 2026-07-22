@@ -1,3 +1,4 @@
+<!-- Verified build: Ver.1.8.5 call-announcement-timer-stop -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -90,6 +91,9 @@ input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;
 .quiz-meta div{background:var(--pink2);border-radius:12px;padding:9px;text-align:center;font-size:13px}
 .quiz-meta b{display:block;font-size:18px}
 .badge{display:inline-block;padding:4px 9px;border-radius:999px;background:#fff0d0;color:#755200;font-size:12px;font-weight:700}
+.call-announcement{display:none;margin:10px 0;padding:14px;border:3px solid var(--pink);border-radius:16px;background:#fff4f8;text-align:center;font-size:34px;font-weight:900;color:#a30045}
+.call-announcement.show{display:block;animation:callPop .65s ease}
+@keyframes callPop{0%{transform:scale(.75);opacity:0}55%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}
 footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 @media(max-width:700px){
  .mode-grid{grid-template-columns:1fr}
@@ -111,7 +115,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.8.4　ポン実装版</p>
+<p class="sub" style="font-weight:700">Ver.1.8.6　チー実装版</p>
 </header>
 
 <section class="panel">
@@ -139,6 +143,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <div class="stat">ドラ表示<b id="dora">🀙</b></div>
   </div>
   <div id="playMessage" class="message">「新しい一局」を押してください。</div>
+  <div id="callAnnouncement" class="call-announcement" aria-live="assertive"></div>
   <div class="controls">
     <button id="newRoundBtn" class="primary">新しい一局</button>
     <button id="drawBtn" class="blue" disabled>1枚ツモる</button>
@@ -530,13 +535,21 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
 
 function clearOpponentAutoTimer(){
  if(opponentAutoTimer!==null){
    clearTimeout(opponentAutoTimer);
    opponentAutoTimer=null;
  }
+}
+function showCallAnnouncement(text){
+ const el=$('callAnnouncement');
+ el.textContent=text;
+ el.classList.remove('show');
+ void el.offsetWidth;
+ el.classList.add('show');
+ setTimeout(()=>el.classList.remove('show'),1000);
 }
 
 function renderTile(t,i,clickable){
@@ -683,6 +696,17 @@ function passRon(){
  go();
 }
 function declareRon(){
+ if(!sc||finished||callLock)return;
+ if(awaitingRonDecision){
+   clearOpponentAutoTimer();
+   callLock=true;
+   showCallAnnouncement('ロン！');
+   setTimeout(()=>{callLock=false;declareRonCore();},650);
+   return;
+ }
+ declareRonCore();
+}
+function declareRonCore(){
  if(!sc||finished)return;
  if(!awaitingRonDecision||lastOpponentTile===null){
    $('playMessage').className='message error';
@@ -795,6 +819,17 @@ function declareTsumo(){
 }
 
 function declarePon(){
+ if(!sc||finished||callLock)return;
+ if(awaitingRonDecision){
+   clearOpponentAutoTimer();
+   callLock=true;
+   showCallAnnouncement('ポン！');
+   setTimeout(()=>{callLock=false;declarePonCore();},650);
+   return;
+ }
+ declarePonCore();
+}
+function declarePonCore(){
  if(!sc||finished)return;
  if(!awaitingRonDecision||lastOpponentTile===null||!pendingOpponentNext){
    $('playMessage').className='message error';
@@ -875,7 +910,105 @@ $('tsumoBtn').onclick=declareTsumo;
 $('ronBtn').onclick=declareRon;
 $('passBtn').onclick=passRon;
 $('ponBtn').onclick=declarePon;
-['chiBtn','kanBtn'].forEach(id=>$(id).onclick=()=>alert('この機能は今後のバージョンで追加予定です。'));
+$('chiBtn').onclick=declareChi;
+$('kanBtn').onclick=()=>pendingCallNotice('カン！');
+
+function chiOptions(tile){
+ if(tile===null||tile>=27)return [];
+ const suitStart=Math.floor(tile/9)*9;
+ const rank=tile-suitStart;
+ const counts=tileCounts(hand);
+ const options=[];
+ for(const startRank of [rank-2,rank-1,rank]){
+   if(startRank<0||startRank>6)continue;
+   const seq=[suitStart+startRank,suitStart+startRank+1,suitStart+startRank+2];
+   const needed=seq.filter(t=>t!==tile);
+   const needCounts={};
+   needed.forEach(t=>needCounts[t]=(needCounts[t]||0)+1);
+   if(Object.entries(needCounts).every(([t,n])=>counts[Number(t)]>=n)){
+     options.push({start:suitStart+startRank,tiles:seq,needed});
+   }
+ }
+ return options;
+}
+function declareChi(){
+ if(!sc||finished||callLock)return;
+ if(awaitingRonDecision){
+   clearOpponentAutoTimer();
+   callLock=true;
+   showCallAnnouncement('チー！');
+   setTimeout(()=>{callLock=false;declareChiCore();},650);
+   return;
+ }
+ declareChiCore();
+}
+function declareChiCore(){
+ if(!sc||finished)return;
+ if(!awaitingRonDecision||lastOpponentTile===null||!pendingOpponentNext){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='今はチーできる捨て牌がありません。';
+   return;
+ }
+ if(lastOpponentName!=='上家'){
+   $('playMessage').className='message error';
+   $('playMessage').textContent=`誤チーです。チーできるのは上家の捨て牌だけです。「次へ」で続けてください。`;
+   return;
+ }
+ const options=chiOptions(lastOpponentTile);
+ if(options.length===0){
+   $('playMessage').className='message error';
+   $('playMessage').textContent=`誤チーです。${labels[lastOpponentTile]}を使って順子を作れません。「次へ」で続けてください。`;
+   return;
+ }
+ let chosen=options[0];
+ if(options.length>1){
+   const menu=options.map((o,i)=>`${i+1}：${o.tiles.map(t=>labels[t]).join('・')}`).join('\n');
+   const answer=prompt(`どの組み合わせでチーしますか？\n${menu}\n\n番号を入力してください。`,'1');
+   if(answer===null){
+     $('playMessage').className='message';
+     $('playMessage').textContent='チーの組み合わせ選択をやめました。「次へ」で続けられます。';
+     return;
+   }
+   const n=Number(answer)-1;
+   if(!Number.isInteger(n)||n<0||n>=options.length){
+     $('playMessage').className='message error';
+     $('playMessage').textContent='番号が正しくありません。もう一度「チー」を押すか、「次へ」で続けてください。';
+     return;
+   }
+   chosen=options[n];
+ }
+ clearOpponentAutoTimer();
+ for(const tile of chosen.needed){
+   const i=hand.indexOf(tile);
+   if(i>=0)hand.splice(i,1);
+ }
+ const river=kamichaDiscards;
+ if(river&&river[river.length-1]===lastOpponentTile)river.pop();
+ openMelds.push({type:'sequence',start:chosen.start,tiles:[...chosen.tiles],open:true,from:lastOpponentName,calledTile:lastOpponentTile});
+ resumeAfterCall=pendingOpponentNext;
+ pendingOpponentNext=null;
+ awaitingRonDecision=false;
+ opponentsActing=false;
+ awaitingDiscard=true;
+ currentDraw=null;
+ drawnIndex=-1;
+ riichi=false;
+ riichiJustDeclared=false;
+ $('playMessage').className='message win';
+ $('playMessage').textContent=`上家の${labels[lastOpponentTile]}をチーして、${chosen.tiles.map(t=>labels[t]).join('・')}を作りました。手牌から1枚捨ててください。`;
+ renderPlay();
+}
+
+function pendingCallNotice(callText){
+ if(callLock)return;
+ if(awaitingRonDecision)clearOpponentAutoTimer();
+ callLock=true;
+ showCallAnnouncement(callText);
+ setTimeout(()=>{
+   callLock=false;
+   alert('この機能は今後のバージョンで追加予定です。');
+ },650);
+}
 
 function spokenNumberToDigits(text){
  const simple={
