@@ -110,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.8.2　他家打牌・自動進行版</p>
+<p class="sub" style="font-weight:700">Ver.1.8.3　他家打牌・8秒待機版</p>
 </header>
 
 <section class="panel">
@@ -657,7 +657,7 @@ function playOpponentTurns(){
        $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}は自動で次へ進みました。`;
        go();
      }
-   },2500);
+   },8000);
  };
  next();
 }
@@ -818,7 +818,7 @@ $('riichiBtn').onclick=()=>{
 $('tsumoBtn').onclick=declareTsumo;
 $('ronBtn').onclick=declareRon;
 $('passBtn').onclick=passRon;
-['ponBtn','chiBtn','kanBtn'].forEach(id=>$(id).onclick=()=>alert('この機能はVer.1.8.3以降で追加予定です。'));
+['ponBtn','chiBtn','kanBtn'].forEach(id=>$(id).onclick=()=>alert('この機能は今後のバージョンで追加予定です。'));
 
 function spokenNumberToDigits(text){
  const simple={
