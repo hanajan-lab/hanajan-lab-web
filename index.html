@@ -115,7 +115,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.8.6　チー実装版</p>
+<p class="sub" style="font-weight:700">Ver.1.8.7　カン実装版</p>
 </header>
 
 <section class="panel">
@@ -911,7 +911,61 @@ $('ronBtn').onclick=declareRon;
 $('passBtn').onclick=passRon;
 $('ponBtn').onclick=declarePon;
 $('chiBtn').onclick=declareChi;
-$('kanBtn').onclick=()=>pendingCallNotice('カン！');
+$('kanBtn').onclick=declareKan;
+
+
+function declareKan(){
+ if(!sc||finished||callLock)return;
+ if(awaitingRonDecision){
+   clearOpponentAutoTimer();
+   callLock=true;
+   showCallAnnouncement('カン！');
+   setTimeout(()=>{callLock=false;declareKanCore();},650);
+   return;
+ }
+ declareKanCore();
+}
+function declareKanCore(){
+ if(!sc||finished)return;
+ if(!awaitingRonDecision||lastOpponentTile===null||!pendingOpponentNext){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='今は大明槓できる捨て牌がありません。';
+   return;
+ }
+ const matches=[];
+ hand.forEach((t,i)=>{if(t===lastOpponentTile)matches.push(i)});
+ if(matches.length<3){
+   $('playMessage').className='message error';
+   $('playMessage').textContent=`誤カンです。${labels[lastOpponentTile]}が手牌に3枚ありません。「次へ」で続けてください。`;
+   return;
+ }
+ if(wall.length===0){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='嶺上牌を引ける牌が残っていないため、カンできません。';
+   return;
+ }
+ clearOpponentAutoTimer();
+ const tile=lastOpponentTile;
+ for(const i of matches.slice(0,3).sort((a,b)=>b-a))hand.splice(i,1);
+ const riverMap={上家:kamichaDiscards,対面:toimenDiscards,下家:shimochaDiscards};
+ const river=riverMap[lastOpponentName];
+ if(river&&river[river.length-1]===tile)river.pop();
+ openMelds.push({type:'quad',tile,tiles:[tile,tile,tile,tile],open:true,from:lastOpponentName});
+ const rinshan=wall.shift();
+ hand.push(rinshan);
+ currentDraw=rinshan;
+ drawnIndex=hand.length-1;
+ resumeAfterCall=pendingOpponentNext;
+ pendingOpponentNext=null;
+ awaitingRonDecision=false;
+ opponentsActing=false;
+ awaitingDiscard=true;
+ riichi=false;
+ riichiJustDeclared=false;
+ $('playMessage').className='message win';
+ $('playMessage').textContent=`${lastOpponentName}の${labels[tile]}をカンしました。嶺上牌の${labels[rinshan]}をツモりました。和了なら「ツモ！」、違えば1枚捨ててください。`;
+ renderPlay();
+}
 
 function chiOptions(tile){
  if(tile===null||tile>=27)return [];
