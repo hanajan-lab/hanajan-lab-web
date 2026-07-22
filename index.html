@@ -144,8 +144,11 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <button id="sortBtn">並べ替え</button>
     <button id="riichiBtn" class="warn">リーチ宣言</button>
     <button id="tsumoBtn" class="good">ツモ！</button>
-    <button id="ronBtn" class="primary" disabled>ロン！</button>
-    <button id="passBtn" disabled>見送る</button>
+    <button id="ronBtn" class="primary" disabled>ロン</button>
+    <button id="ponBtn">ポン</button>
+    <button id="chiBtn">チー</button>
+    <button id="kanBtn">カン</button>
+    <button id="passBtn">次へ</button>
   </div>
 </section>
 
@@ -796,6 +799,7 @@ $('riichiBtn').onclick=()=>{
 $('tsumoBtn').onclick=declareTsumo;
 $('ronBtn').onclick=declareRon;
 $('passBtn').onclick=passRon;
+['ponBtn','chiBtn','kanBtn'].forEach(id=>$(id).onclick=()=>alert('この機能はVer.1.8.3以降で追加予定です。'));
 
 function spokenNumberToDigits(text){
  const simple={
