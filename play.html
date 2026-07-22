@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>花雀LAB｜一局遊ぶ</title>
+<style>
+:root{--bg:#fff8fb;--panel:#fff;--ink:#2d2730;--muted:#766b73;--pink:#d94b79;--soft:#fde7ef;--line:#e8d6de;--green:#24734d;--blue:#315f9b;--red:#b52d42}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;background:var(--bg);color:var(--ink)}
+main{width:min(1050px,100%);margin:auto;padding:12px 10px 40px}header{text-align:center;padding:8px}h1{font-size:clamp(30px,7vw,50px);margin:0}.sub{color:var(--muted);margin:4px 0 12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 4px 18px #8b55700d}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.stat{background:var(--soft);border-radius:13px;text-align:center;padding:9px 5px;font-size:13px}.stat b{display:block;font-size:20px;margin-top:3px}
+.message{text-align:center;font-weight:700;padding:14px;border-radius:13px;background:#faf5f7}.message.win{background:#e9f7ef;color:var(--green)}
+.controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}button{border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px 16px;font-size:16px;font-weight:700;cursor:pointer}button:disabled{opacity:.4;cursor:not-allowed}.primary{background:var(--pink);color:#fff;border-color:var(--pink)}.blue{background:var(--blue);color:#fff;border-color:var(--blue)}.good{background:var(--green);color:#fff;border-color:var(--green)}
+#hand{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;padding:8px 1px 12px}.tile{flex:0 0 60px;min-height:88px;padding:5px 2px;background:#fffdf5;border:1px solid #cfc4aa;border-radius:8px}.tile.drawn{border:3px solid var(--pink);transform:translateY(-5px)}.tile.discardable:hover{transform:translateY(-5px)}.glyph{display:block;font-size:42px;line-height:1}.label{font-size:11px;display:block;margin-top:3px}
+.discards{display:flex;flex-wrap:wrap;gap:3px;min-height:48px}.mini{width:37px;text-align:center;border:1px solid #ddd0b9;background:#fffdf5;border-radius:5px;padding:2px}.mini .glyph{font-size:25px}.mini .label{font-size:9px}
+.answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:14px;font-weight:700}input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}.result{display:none;margin-top:12px;border-radius:13px;padding:14px}.result.show{display:block}.result.correct{background:#e9f7ef;color:var(--green)}.result.wrong{background:#fff0f2;color:var(--red)}
+.note{font-size:13px;color:var(--muted);line-height:1.6}.back{display:inline-block;margin-top:10px;color:var(--pink);font-weight:700;text-decoration:none}
+@media(max-width:650px){.stats{grid-template-columns:repeat(3,1fr)}.tile{flex-basis:50px;min-height:76px}.glyph{font-size:34px}.answer-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>🌸 花雀LAB</h1><p class="sub">一局遊ぶ自主練</p></header>
+
+<section class="panel">
+  <div class="stats">
+    <div class="stat">巡目<b id="turn">0</b></div>
+    <div class="stat">山の残り<b id="wallCount">0</b></div>
+    <div class="stat">場風<b id="roundWind">東</b></div>
+    <div class="stat">自風<b id="seatWind">南</b></div>
+    <div class="stat">親・子<b id="dealer">子</b></div>
+    <div class="stat">ドラ表示<b id="dora">🀙</b></div>
+  </div>
+  <div id="message" class="message">「新しい一局」を押してください。</div>
+  <div class="controls">
+    <button id="newBtn" class="primary">新しい一局</button>
+    <button id="drawBtn" class="blue" disabled>1枚ツモる</button>
+    <button id="sortBtn">並べ替え</button>
+    <button id="riichiBtn" disabled>リーチ宣言</button>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>手牌</h2>
+  <p class="note">ツモった後、切りたい牌をクリックします。赤い枠がツモ牌です。</p>
+  <div id="hand"></div>
+</section>
+
+<section class="panel">
+  <h2>捨て牌</h2>
+  <div id="discards" class="discards"></div>
+</section>
+
+<section id="answerPanel" class="panel" style="display:none">
+  <h2>和了しました！ 声に出して答えましょう</h2>
+  <div class="answer-grid">
+    <label>役<input id="yakuInput" placeholder="リーチ・ツモ・タンヤオなど"></label>
+    <label>点数<input id="pointsInput" placeholder="1000/2000" inputmode="numeric"></label>
+  </div>
+  <div class="controls">
+    <button id="checkBtn" class="good">答え合わせ</button>
+    <button id="showBtn">正解を見る</button>
+    <button id="nextBtn" class="primary">次の一局</button>
+  </div>
+  <div id="result" class="result"></div>
+</section>
+
+<a class="back" href="index.html">← 点数問題へ戻る</a>
+</main>
+
+<script>
+const labels=['1萬','2萬','3萬','4萬','5萬','6萬','7萬','8萬','9萬','1筒','2筒','3筒','4筒','5筒','6筒','7筒','8筒','9筒','1索','2索','3索','4索','5索','6索','7索','8索','9索','東','南','西','北','白','發','中'];
+const glyphs=['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏','🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡','🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘','🀀','🀁','🀂','🀃','🀆','🀅','🀄'];
+const T={m:n=>n-1,p:n=>9+n-1,s:n=>18+n-1,E:27,S:28,W:29,N:30,H:31,F:32,C:33};
+const scenarios=[
+ {hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.p(5),T.s(4),T.s(5),T.s(6),T.p(7)],win:T.p(7),round:'東',seat:'南',dealer:'子',dora:T.m(3),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'子の3翻20符ツモ。'},
+ {hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(3),T.p(4),T.s(7),T.s(8),T.s(9),T.E],win:T.E,round:'東',seat:'東',dealer:'親',dora:T.s(6),yaku:['ツモ'],han:1,fu:30,points:'500オール',note:'親のツモのみ。'},
+ {hand:[T.m(2),T.m(3),T.m(4),T.p(3),T.p(4),T.p(5),T.s(3),T.s(4),T.s(5),T.s(6),T.s(7),T.s(8),T.p(6)],win:T.p(6),round:'南',seat:'西',dealer:'子',dora:T.p(5),yaku:['ツモ','タンヤオ','三色'],han:4,fu:30,points:'2000/4000',note:'満貫の子ツモ。'}
+];
+const $=id=>document.getElementById(id);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+let sc=null,hand=[],wall=[],discards=[],drawn=-1,awaiting=false,finished=false,turn=0,riichi=false;
+
+function tileButton(t,i){
+ const b=document.createElement('button');
+ b.className='tile'+(i===drawn&&awaiting?' drawn':'')+(awaiting&&!finished?' discardable':'');
+ b.innerHTML=`<span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span>`;
+ b.disabled=!awaiting||finished;
+ b.onclick=()=>discard(i);
+ return b;
+}
+function render(){
+ $('hand').innerHTML='';hand.forEach((t,i)=>$('hand').appendChild(tileButton(t,i)));
+ $('discards').innerHTML=discards.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
+ $('turn').textContent=turn;$('wallCount').textContent=wall.length;
+ $('drawBtn').disabled=awaiting||finished||!sc||wall.length===0;
+ $('riichiBtn').disabled=!sc||finished||riichi;
+ $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
+}
+function newRound(){
+ sc=scenarios[Math.floor(Math.random()*scenarios.length)];
+ hand=[...sc.hand].sort((a,b)=>a-b);
+ const junk=[T.H,T.F,T.C,T.W,T.N,T.m(9),T.p(1),T.s(1),T.m(1),T.p(9),T.s(9)];
+ wall=shuffle([...junk]).slice(0,7);
+ wall.splice(2+Math.floor(Math.random()*3),0,sc.win);
+ discards=[];drawn=-1;awaiting=false;finished=false;turn=0;riichi=false;
+ $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
+ $('message').className='message';$('message').textContent='13枚を配りました。「1枚ツモる」を押してください。';
+ $('answerPanel').style.display='none';$('result').className='result';$('yakuInput').value='';$('pointsInput').value='';
+ render();
+}
+function draw(){
+ if(!sc||awaiting||finished||!wall.length)return;
+ const t=wall.shift();hand.push(t);drawn=hand.length-1;awaiting=true;turn++;
+ if(t===sc.win){
+   finished=true;$('message').className='message win';
+   $('message').textContent=`${labels[t]}をツモ！ 役と点数を声に出してください。`;
+   $('answerPanel').style.display='block';
+ }else $('message').textContent=`${labels[t]}をツモりました。切る牌を1枚クリックしてください。`;
+ render();
+}
+function discard(i){
+ if(!awaiting||finished)return;
+ const t=hand.splice(i,1)[0];discards.push(t);hand.sort((a,b)=>a-b);drawn=-1;awaiting=false;
+ $('message').textContent=`${labels[t]}を切りました。次をツモってください。`;
+ if(!wall.length){finished=true;$('message').textContent='流局です。「新しい一局」で再挑戦しましょう。'}
+ render();
+}
+function norm(s){return String(s).replace(/[・,\s点]/g,'').replace(/オール/g,'all').toLowerCase()}
+function reveal(ok){
+ const y=[...sc.yaku];if(riichi)y.unshift('リーチ');
+ const r=$('result');r.className='result show '+(ok?'correct':'wrong');
+ r.innerHTML=`<h3>${ok?'🎉 正解！':'📖 正解はこちら'}</h3><b>${y.join('・')}</b><br>${sc.han+(riichi?1:0)}翻 ${sc.fu}符　<b>${sc.points}</b><br>${sc.note}`;
+}
+$('newBtn').onclick=newRound;$('nextBtn').onclick=newRound;$('drawBtn').onclick=draw;
+$('sortBtn').onclick=()=>{hand.sort((a,b)=>a-b);drawn=-1;render()};
+$('riichiBtn').onclick=()=>{riichi=true;$('message').textContent='リーチを宣言しました！';render()};
+$('showBtn').onclick=()=>reveal(false);
+$('checkBtn').onclick=()=>{
+ const y=norm($('yakuInput').value),p=norm($('pointsInput').value);
+ const needed=[...sc.yaku];if(riichi)needed.push('リーチ');
+ reveal(needed.every(v=>y.includes(norm(v)))&&p===norm(sc.points));
+};
+render();
+</script>
+</body>
+</html>
