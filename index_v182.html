@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>花雀LAB｜麻雀点数計算・一局自主練</title>
+<style>
+:root{
+  --bg:#fff8fb;--panel:#fff;--ink:#2e2830;--muted:#756b72;
+  --pink:#d84c7a;--pink2:#fde6ee;--line:#ead8df;--green:#26734d;
+  --blue:#35639d;--red:#b83047;--gold:#a56b00
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif}
+main{width:min(1100px,100%);margin:auto;padding:14px 10px 42px}
+header{text-align:center;padding:8px 0 12px}
+h1{font-size:clamp(32px,7vw,52px);margin:0}
+h2{margin:0 0 10px}
+.sub{color:var(--muted);margin:5px 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 5px 18px #6e3b550c}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mode-card{border:2px solid var(--line);border-radius:16px;padding:18px;background:#fff;text-align:left;cursor:pointer}
+.mode-card.active{border-color:var(--pink);background:var(--pink2)}
+.mode-card b{display:block;font-size:22px;margin-bottom:5px}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.stat{background:var(--pink2);border-radius:13px;text-align:center;padding:9px 4px;font-size:13px}
+.stat b{display:block;font-size:20px;margin-top:3px}
+.message{text-align:center;font-weight:700;padding:14px;border-radius:13px;background:#faf5f7;margin-top:12px}
+.message.win{background:#e8f7ef;color:var(--green)}
+.message.error{background:#fff0f2;color:var(--red);border:2px solid #efb7c0}
+.voice-status{margin-top:10px;font-weight:700;color:var(--muted)}
+.voice-status.listening{color:var(--green)}
+.voice-status.error{color:var(--red)}
+.mic-listening{outline:3px solid rgba(20,120,80,.25);transform:scale(1.02)}
+.controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:12px}
+button{border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px 16px;font-size:16px;font-weight:700;cursor:pointer}
+button:hover:not(:disabled){transform:translateY(-1px)}
+button:disabled{opacity:.42;cursor:not-allowed}
+.tile:disabled{opacity:1;color:var(--ink);cursor:default}
+.tile:disabled:hover{transform:none}
+.primary{background:var(--pink);color:#fff;border-color:var(--pink)}
+.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+.good{background:var(--green);color:#fff;border-color:var(--green)}
+.warn{background:#fff7dd;color:#775100;border-color:#e4c96c}
+.hidden{display:none!important}
+#playHand,#quizHand{display:flex;flex-wrap:nowrap;gap:3px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:10px 2px 14px}
+.tile{flex:0 0 70px;min-height:102px;padding:7px 3px;background:#fffdf5;border:1px solid #cfc4aa;border-radius:9px}
+.tile.drawn{border:3px solid var(--pink);transform:translateY(-6px)}
+.tile.discardable:hover{transform:translateY(-5px)}
+.glyph{display:block;font-size:52px;line-height:1}
+.label{display:block;font-size:13px;margin-top:5px;font-weight:700}
+.discards{
+  display:grid;
+  grid-template-columns:repeat(6,42px);
+  gap:5px;
+  min-height:54px;
+  align-content:start;
+}
+.river-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.river-box{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
+.river-box h3{font-size:15px;margin:0 0 8px;text-align:center}
+.river-box.me{border:2px solid var(--pink)}
+.river-box.me .discards{
+  grid-template-columns:repeat(6,47px);
+}
+@media(max-width:640px){
+  .discards{
+    grid-template-columns:repeat(6,38px);
+    gap:4px;
+  }
+  .river-box.me .discards{
+    grid-template-columns:repeat(6,41px);
+  }
+}
+
+@media(max-width:640px){.river-grid{grid-template-columns:1fr}}
+.mini{width:42px;min-height:56px;text-align:center;border:1px solid #ddd0b9;background:#fffdf5;border-radius:6px;padding:3px 2px}
+.mini .glyph{font-size:35px}.mini .label{font-size:10px;margin-top:2px}
+.river-box.me .mini{width:47px;min-height:62px}
+.river-box.me .mini .glyph{font-size:30px}
+.river-box.me .mini .label{font-size:11px}
+.answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-size:14px;font-weight:700}
+input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}
+.result{display:none;margin-top:12px;border-radius:13px;padding:14px;line-height:1.7}
+.result.show{display:block}.result.correct{background:#e8f7ef;color:var(--green)}.result.wrong{background:#fff0f2;color:var(--red)}
+.note{font-size:13px;color:var(--muted);line-height:1.6}
+.quiz-meta{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.quiz-meta div{background:var(--pink2);border-radius:12px;padding:9px;text-align:center;font-size:13px}
+.quiz-meta b{display:block;font-size:18px}
+.badge{display:inline-block;padding:4px 9px;border-radius:999px;background:#fff0d0;color:#755200;font-size:12px;font-weight:700}
+footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
+@media(max-width:700px){
+ .mode-grid{grid-template-columns:1fr}
+ .stats{grid-template-columns:repeat(3,1fr)}
+ .quiz-meta{grid-template-columns:repeat(2,1fr)}
+ .answer-grid{grid-template-columns:1fr}
+ .tile{flex-basis:56px;min-height:84px}
+ .glyph{font-size:40px}
+ .label{font-size:12px}
+ .mini{width:41px;min-height:55px}
+ .mini .glyph{font-size:30px}
+ .river-box.me .mini{width:45px;min-height:60px}
+ .river-box.me .mini .glyph{font-size:34px}
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>🌸 花雀LAB</h1>
+  <p class="sub">麻雀点数計算・声に出して自主練</p>
+<p class="sub" style="font-weight:700">Ver.1.8.1　スマホ横スクロール修正版</p>
+</header>
+
+<section class="panel">
+  <h2>練習を選ぶ</h2>
+  <div class="mode-grid">
+    <button id="modePlay" class="mode-card active">
+      <b>🀄 一局遊ぶ</b>
+      ツモして、牌を切り、和了したら役と点数を答えます。
+    </button>
+    <button id="modeQuiz" class="mode-card">
+      <b>🧮 点数問題</b>
+      完成した手牌を見て、役と点数をすぐ答えます。
+    </button>
+  </div>
+</section>
+
+<div id="playMode">
+<section class="panel">
+  <div class="stats">
+    <div class="stat">巡目<b id="turn">0</b></div>
+    <div class="stat">残りツモ<b id="wallCount">0</b></div>
+    <div class="stat">場風<b id="roundWind">東</b></div>
+    <div class="stat">自風<b id="seatWind">南</b></div>
+    <div class="stat">親・子<b id="dealer">子</b></div>
+    <div class="stat">ドラ表示<b id="dora">🀙</b></div>
+  </div>
+  <div id="playMessage" class="message">「新しい一局」を押してください。</div>
+  <div class="controls">
+    <button id="newRoundBtn" class="primary">新しい一局</button>
+    <button id="drawBtn" class="blue" disabled>1枚ツモる</button>
+    <button id="sortBtn">並べ替え</button>
+    <button id="riichiBtn" class="warn">リーチ宣言</button>
+    <button id="tsumoBtn" class="good">ツモ！</button>
+    <button id="ronBtn" class="primary" disabled>ロン</button>
+    <button id="ponBtn">ポン</button>
+    <button id="chiBtn">チー</button>
+    <button id="kanBtn">カン</button>
+    <button id="passBtn">次へ</button>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>手牌</h2>
+  <p class="note">ツモったら、自分で和了か、リーチするかを判断します。ツモなら「ツモ！」。リーチなら「リーチ宣言」を押してから、リーチ牌を1枚捨てます。ボタンの色は答えのヒントになりません。</p>
+  <div id="playHand"></div>
+</section>
+
+<section class="panel">
+  <h2>捨て牌</h2>
+  <div class="river-grid">
+    <div class="river-box">
+      <h3>上家</h3>
+      <div id="kamichaDiscards" class="discards"></div>
+    </div>
+    <div class="river-box">
+      <h3>対面</h3>
+      <div id="toimenDiscards" class="discards"></div>
+    </div>
+    <div class="river-box">
+      <h3>下家</h3>
+      <div id="shimochaDiscards" class="discards"></div>
+    </div>
+    <div class="river-box me">
+      <h3>自分</h3>
+      <div id="discards" class="discards"></div>
+    </div>
+  </div>
+</section>
+
+<section id="playAnswerPanel" class="panel hidden">
+  <h2 id="playAnswerTitle">和了！ 声に出して答えましょう</h2>
+  <div class="answer-grid">
+    <label>役<input id="playYaku" placeholder="リーチ・ツモ・タンヤオなど"></label>
+    <label>点数<input id="playPoints" placeholder="1000/2000" inputmode="numeric"></label>
+  </div>
+  <div class="controls">
+    <button id="playMic" class="blue">🎤 まとめて話す</button>
+    <button id="playCheck" class="good">答え合わせ</button>
+    <button id="playShow">正解を見る</button>
+    <button id="playNext" class="primary">次の一局</button>
+  </div>
+  <div id="playVoiceStatus" class="voice-status">役と点数を一息で話せます。手入力もできます。</div>
+  <div id="playResult" class="result"></div>
+</section>
+</div>
+
+<div id="quizMode" class="hidden">
+<section class="panel">
+  <div class="quiz-meta">
+    <div>問題<b id="quizNo">1</b></div>
+    <div>正解<b id="quizCorrect">0</b></div>
+    <div>連続正解<b id="quizStreak">0</b></div>
+    <div>親・子<b id="quizDealer">子</b></div>
+    <div>和了<b id="quizWinType">ツモ</b></div>
+  </div>
+  <div id="quizHand"></div>
+  <div class="answer-grid">
+    <label>役<input id="quizYaku" placeholder="タンヤオ・ピンフなど"></label>
+    <label>点数<input id="quizPoints" placeholder="700/1300" inputmode="numeric"></label>
+  </div>
+  <div class="controls">
+    <button id="quizMic" class="blue">🎤 まとめて話す</button>
+    <button id="quizCheck" class="good">答え合わせ</button>
+    <button id="quizShow">正解を見る</button>
+    <button id="quizNext" class="primary">次の問題</button>
+  </div>
+  <div id="quizVoiceStatus" class="voice-status">役と点数を一息で話せます。手入力もできます。</div>
+  <div id="quizResult" class="result"></div>
+</section>
+</div>
+
+<section class="panel">
+  <span class="badge">現在の範囲</span>
+  <p class="note">
+    この版は、点数計算の自主練を目的にした一人用です。ツモと打牌を繰り返し、
+    あらかじめ用意された和了形に自分で気づき、「ツモ！」を宣言します。対戦相手の思考、鳴き、放銃、局進行までを再現する
+    四人対戦ゲームではありません。
+  </p>
+</section>
+
+<footer>毎日10分。間違えても大丈夫、声に出すほど強くなる。</footer>
+</main>
+
+<script>
+'use strict';
+const labels=['1萬','2萬','3萬','4萬','5萬','6萬','7萬','8萬','9萬','1筒','2筒','3筒','4筒','5筒','6筒','7筒','8筒','9筒','1索','2索','3索','4索','5索','6索','7索','8索','9索','東','南','西','北','白','發','中'];
+const glyphs=['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏','🀙','🀚','🀛','🀜','🀝','🀞','🀟','🀠','🀡','🀐','🀑','🀒','🀓','🀔','🀕','🀖','🀗','🀘','🀀','🀁','🀂','🀃','🀆','🀅','🀄'];
+const T={m:n=>n-1,p:n=>9+n-1,s:n=>18+n-1,E:27,S:28,W:29,N:30,H:31,F:32,C:33};
+const $=id=>document.getElementById(id);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const norm=s=>String(s).replace(/[・,、\s点]/g,'').replace(/オール/g,'all').toLowerCase();
+function tileCounts(tiles){
+ const c=Array(34).fill(0);
+ tiles.forEach(t=>c[t]++);
+ return c;
+}
+function canMakeMelds(c){
+ let i=c.findIndex(n=>n>0);
+ if(i===-1)return true;
+ if(c[i]>=3){
+   c[i]-=3;
+   if(canMakeMelds(c)){c[i]+=3;return true}
+   c[i]+=3;
+ }
+ if(i<27&&i%9<=6&&c[i+1]>0&&c[i+2]>0){
+   c[i]--;c[i+1]--;c[i+2]--;
+   if(canMakeMelds(c)){c[i]++;c[i+1]++;c[i+2]++;return true}
+   c[i]++;c[i+1]++;c[i+2]++;
+ }
+ return false;
+}
+function isStandardWin(tiles){
+ if(tiles.length!==14)return false;
+ const c=tileCounts(tiles);
+ for(let i=0;i<34;i++){
+   if(c[i]>=2){
+     c[i]-=2;
+     if(canMakeMelds(c)){c[i]+=2;return true}
+     c[i]+=2;
+   }
+ }
+ return false;
+}
+function isSevenPairs(tiles){
+ if(tiles.length!==14)return false;
+ const c=tileCounts(tiles);
+ return c.filter(n=>n===2).length===7;
+}
+function isKokushi(tiles){
+ if(tiles.length!==14)return false;
+ const yaochu=[0,8,9,17,18,26,27,28,29,30,31,32,33];
+ const c=tileCounts(tiles);
+ return yaochu.every(i=>c[i]>=1)&&yaochu.some(i=>c[i]>=2);
+}
+function isWinningHand(tiles){
+ return isStandardWin(tiles)||isSevenPairs(tiles)||isKokushi(tiles);
+}
+function isTenpai(tiles){
+ if(tiles.length!==13)return false;
+ const c=tileCounts(tiles);
+ for(let t=0;t<34;t++){
+   if(c[t]<4&&isWinningHand([...tiles,t]))return true;
+ }
+ return false;
+}
+function doraFromIndicator(indicator){
+ if(indicator<27){
+   const suitStart=Math.floor(indicator/9)*9;
+   return suitStart+((indicator-suitStart+1)%9);
+ }
+ if(indicator>=27&&indicator<=30)return indicator===30?27:indicator+1;
+ return indicator===33?31:indicator+1;
+}
+function countDora(tiles,indicator){
+ const dora=doraFromIndicator(indicator);
+ return tiles.filter(t=>t===dora).length;
+}
+function getStandardDecompositions(tiles){
+ const results=[];
+ if(tiles.length!==14)return results;
+ const counts=tileCounts(tiles);
+
+ function takeMelds(c,melds){
+   const i=c.findIndex(n=>n>0);
+   if(i===-1){
+     results.push({pair:currentPair,melds:[...melds]});
+     return;
+   }
+   if(c[i]>=3){
+     c[i]-=3;
+     melds.push({type:'triplet',tile:i});
+     takeMelds(c,melds);
+     melds.pop();
+     c[i]+=3;
+   }
+   if(i<27&&i%9<=6&&c[i+1]>0&&c[i+2]>0){
+     c[i]--;c[i+1]--;c[i+2]--;
+     melds.push({type:'sequence',start:i});
+     takeMelds(c,melds);
+     melds.pop();
+     c[i]++;c[i+1]++;c[i+2]++;
+   }
+ }
+
+ let currentPair=-1;
+ for(let p=0;p<34;p++){
+   if(counts[p]>=2){
+     const c=[...counts];
+     c[p]-=2;
+     currentPair=p;
+     takeMelds(c,[]);
+   }
+ }
+ return results;
+}
+function isTerminalOrHonor(t){
+ return t>=27||t%9===0||t%9===8;
+}
+function isValuePair(tile,round,seat){
+ if(tile>=31)return true;
+ const windMap={東:27,南:28,西:29,北:30};
+ return tile===windMap[round]||tile===windMap[seat];
+}
+function waitTypeForSequence(start,winTile){
+ if(winTile===start+1)return 'カンチャン';
+ if(winTile===start){
+   return start%9===6?'ペンチャン':'両面';
+ }
+ if(winTile===start+2){
+   return start%9===0?'ペンチャン':'両面';
+ }
+ return null;
+}
+function decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType='ツモ'){
+ const sequences=dec.melds.filter(m=>m.type==='sequence');
+ const triplets=dec.melds.filter(m=>m.type==='triplet');
+ const allSequences=sequences.length===4;
+ const tanyao=tiles.every(t=>!isTerminalOrHonor(t));
+
+ const starts=new Set(sequences.map(m=>m.start));
+ let sanshoku=false;
+ for(let rank=0;rank<=6;rank++){
+   if(starts.has(rank)&&starts.has(9+rank)&&starts.has(18+rank)){
+     sanshoku=true;
+     break;
+   }
+ }
+
+ const possibleWaits=[];
+ if(dec.pair===winTile)possibleWaits.push('単騎');
+ for(const m of sequences){
+   const w=waitTypeForSequence(m.start,winTile);
+   if(w)possibleWaits.push(w);
+ }
+ for(const m of triplets){
+   if(m.tile===winTile)possibleWaits.push('シャンポン');
+ }
+ if(!possibleWaits.length)possibleWaits.push('不明');
+
+ const pairIsValue=isValuePair(dec.pair,round,seat);
+ const hasRyanmen=possibleWaits.includes('両面');
+ const pinfu=allSequences&&!pairIsValue&&hasRyanmen;
+
+ const yaku=[];
+ let han=0;
+ if(winType==='ツモ'){yaku.push('ツモ');han+=1}
+ if(tanyao){yaku.push('タンヤオ');han+=1}
+ if(pinfu){yaku.push('ピンフ');han+=1}
+ if(sanshoku){yaku.push('三色');han+=2}
+
+ let fu;
+ if(pinfu){
+   fu=winType==='ツモ'?20:30;
+ }else{
+   let raw=20+(winType==='ツモ'?2:10);
+   if(dec.pair>=31)raw+=2;
+   const windMap={東:27,南:28,西:29,北:30};
+   if(dec.pair===windMap[round])raw+=2;
+   if(dec.pair===windMap[seat])raw+=2;
+   for(const m of triplets){
+     const ronOpen=winType==='ロン'&&m.tile===winTile&&possibleWaits.includes('シャンポン');
+     if(isTerminalOrHonor(m.tile))raw+=ronOpen?4:8;
+     else raw+=ronOpen?2:4;
+   }
+   if(possibleWaits.some(w=>w==='単騎'||w==='カンチャン'||w==='ペンチャン'))raw+=2;
+   fu=Math.ceil(raw/10)*10;
+ }
+ return {yaku,han,fu,pinfu,sanshoku,tanyao,waits:possibleWaits};
+}
+function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicator,withRiichi=false,winType='ツモ'){
+ const doraCount=countDora(tiles,doraIndicator);
+ const pointCalc=(han,fu)=>winType==='ツモ'?tsumoPoints(han,fu,dealer):ronPoints(han,fu,dealer);
+
+ if(isKokushi(tiles)){
+   const yaku=winType==='ツモ'?['ツモ','国士無双']:['国士無双'];
+   return {yaku,han:13,fu:0,
+     points:winType==='ツモ'
+       ?(dealer==='親'?'16000オール':'8000/16000')
+       :(dealer==='親'?'48000':'32000'),
+     doraCount};
+ }
+ if(isSevenPairs(tiles)){
+   const yaku=['七対子'];
+   let han=2;
+   if(winType==='ツモ'){yaku.unshift('ツモ');han++}
+   if(tiles.every(t=>!isTerminalOrHonor(t))){yaku.push('タンヤオ');han++}
+   if(withRiichi){yaku.unshift('リーチ');han++}
+   if(doraCount){yaku.push(`ドラ${doraCount}`);han+=doraCount}
+   return {yaku,han,fu:25,points:pointCalc(han,25),doraCount};
+ }
+
+ const choices=getStandardDecompositions(tiles).map(dec=>
+   decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType)
+ );
+ if(!choices.length){
+   return {yaku:[],han:0,fu:0,points:'—',doraCount};
+ }
+
+ choices.sort((a,b)=>{
+   if(b.han!==a.han)return b.han-a.han;
+   return b.fu-a.fu;
+ });
+ const best=choices[0];
+ const yaku=[...best.yaku];
+ let han=best.han;
+ if(withRiichi){yaku.unshift('リーチ');han++}
+ if(doraCount>0){yaku.push(`ドラ${doraCount}`);han+=doraCount}
+ return {
+   yaku,han,fu:best.fu,
+   points:pointCalc(han,best.fu),
+   doraCount,
+   waits:best.waits
+ };
+}
+function answerYakuMatches(input,expected){
+ const normalized=norm(input);
+ const known=['リーチ','ツモ','タンヤオ','ピンフ','三色','七対子','国士無双'];
+ const found=[];
+ for(const name of known){
+   if(normalized.includes(norm(name)))found.push(name);
+ }
+ const doraMatch=normalized.match(/ドラ(\d+)/);
+ if(doraMatch)found.push(`ドラ${doraMatch[1]}`);
+ const a=[...new Set(found.map(norm))].sort();
+ const b=[...new Set(expected.map(norm))].sort();
+ return a.length===b.length&&a.every((v,i)=>v===b[i]);
+}
+function roundUp100(n){return Math.ceil(n/100)*100}
+function tsumoPoints(han,fu,dealer){
+ let base;
+ if(han>=13)base=8000;
+ else if(han>=11)base=6000;
+ else if(han>=8)base=4000;
+ else if(han>=6)base=3000;
+ else{
+   base=fu*Math.pow(2,han+2);
+   if(han>=5||base>=2000)base=2000;
+ }
+ if(dealer==='親'){
+   const each=roundUp100(base*2);
+   return `${each}オール`;
+ }
+ return `${roundUp100(base)}/${roundUp100(base*2)}`;
+}
+function ronPoints(han,fu,dealer){
+ let base;
+ if(han>=13)base=8000;
+ else if(han>=11)base=6000;
+ else if(han>=8)base=4000;
+ else if(han>=6)base=3000;
+ else{
+   base=fu*Math.pow(2,han+2);
+   if(han>=5||base>=2000)base=2000;
+ }
+ return `${roundUp100(base*(dealer==='親'?6:4))}`;
+}
+function playAnswerData(){
+ return actualHandAnswerData(hand,winningTile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,currentWinType);
+}
+function scenarioAnswerData(q){
+ const finalTiles=[...q.hand,q.win];
+ return actualHandAnswerData(finalTiles,q.win,q.round,q.seat,q.dealer,q.dora,false,'ツモ');
+}
+
+const scenarios=[
+ {hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.p(5),T.s(4),T.s(5),T.s(6),T.p(7)],win:T.p(7),round:'東',seat:'南',dealer:'子',dora:T.m(3),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'子の3翻20符ツモ。'},
+ {hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(3),T.p(4),T.s(7),T.s(8),T.s(9),T.E],win:T.E,round:'東',seat:'東',dealer:'親',dora:T.s(6),yaku:['ツモ'],han:1,fu:30,points:'500オール',note:'親のツモのみ。'},
+ {hand:[T.m(2),T.m(3),T.m(4),T.p(3),T.p(4),T.p(5),T.s(3),T.s(4),T.s(5),T.s(6),T.s(7),T.s(8),T.p(6)],win:T.p(6),round:'南',seat:'西',dealer:'子',dora:T.p(5),yaku:['ツモ','タンヤオ','三色'],han:4,fu:30,points:'2000/4000',note:'4翻30符は満貫。子のツモ。'},
+ {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
+];
+
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+
+function renderTile(t,i,clickable){
+ const b=document.createElement('button');
+ b.type='button';
+ b.className='tile'+(i===drawnIndex&&awaitingDiscard?' drawn':'')+(clickable?' discardable':'');
+ b.innerHTML=`<span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span>`;
+ b.disabled=!clickable;
+ if(clickable)b.onclick=()=>discardTile(i);
+ return b;
+}
+function renderPlay(){
+ $('playHand').innerHTML='';
+ hand.forEach((t,i)=>{
+   const canDiscard=awaitingDiscard&&!finished&&(!riichi||riichiJustDeclared||i===drawnIndex);
+   $('playHand').appendChild(renderTile(t,i,canDiscard));
+ });
+ const riverHtml=arr=>arr.map(t=>`<div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
+ $('discards').innerHTML=riverHtml(discards);
+ $('kamichaDiscards').innerHTML=riverHtml(kamichaDiscards);
+ $('toimenDiscards').innerHTML=riverHtml(toimenDiscards);
+ $('shimochaDiscards').innerHTML=riverHtml(shimochaDiscards);
+ $('turn').textContent=turn;$('wallCount').textContent=wall.length;
+ // ボタンの状態を答えのヒントにしないため、対局中は全ボタンを通常表示します。
+ const playing=!!sc&&!finished;
+ $('drawBtn').disabled=!playing;
+ $('riichiBtn').disabled=!playing;
+ $('tsumoBtn').disabled=!playing;
+ $('ronBtn').disabled=!playing;
+ $('passBtn').disabled=!playing;
+ $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
+}
+function startRound(){
+ sc=scenarios[Math.floor(Math.random()*scenarios.length)];
+ hand=[...sc.hand].sort((a,b)=>a-b);
+ // 一人用モードでは、実戦で一人がツモる回数に近い18回分を用意します。
+ const pool=[];
+ for(let t=0;t<34;t++)for(let n=0;n<4;n++)pool.push(t);
+ const removeOne=t=>{
+   const i=pool.indexOf(t);
+   if(i>=0)pool.splice(i,1);
+ };
+ hand.forEach(removeOne);
+ removeOne(sc.dora); // ドラ表示牌は王牌側
+ removeOne(sc.win);  // 和了牌1枚を後で山に入れる
+ shuffle(pool);
+ wall=pool.slice(0,17);
+ const winPosition=5+Math.floor(Math.random()*13); // 6～18巡目
+ wall.splice(winPosition,0,sc.win);
+ // 自分の山に使った牌を除き、残りから他家3人の捨て牌を用意します。
+ wall.forEach(removeOne);
+ opponentWall=shuffle([...pool]).slice(0,54);
+ discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];
+ drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
+ $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
+ $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。残りツモは18回です。「1枚ツモる」を押してください。';
+ $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
+ $('playYaku').value='';$('playPoints').value='';
+ $('playVoiceStatus').className='voice-status';$('playVoiceStatus').textContent='役と点数を一息で話せます。手入力もできます。';
+ renderPlay();
+}
+function drawTile(){
+ if(!sc||finished)return;
+ if(awaitingRonDecision){
+   $('playMessage').className='message';
+   $('playMessage').textContent='他家の捨て牌が出ています。自分でロンか見送りかを判断してください。';
+   return;
+ }
+ if(awaitingDiscard){
+   $('playMessage').className='message';
+   $('playMessage').textContent='先に1枚捨ててください。';
+   return;
+ }
+ if(opponentsActing||wall.length===0)return;
+ const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;currentDraw=t;awaitingDiscard=true;turn++;riichiJustDeclared=false;
+ $('playMessage').className='message';
+ $('playMessage').textContent=`${labels[t]}をツモりました。和了なら「ツモ！」、違えば切る牌を選んでください。`;
+ renderPlay();
+}
+function playOpponentTurns(){
+ opponentsActing=true;
+ const turns=[
+   {name:'上家',river:kamichaDiscards},
+   {name:'対面',river:toimenDiscards},
+   {name:'下家',river:shimochaDiscards}
+ ];
+ let index=0;
+ const next=()=>{
+   if(index>=turns.length){
+     opponentsActing=false;
+     awaitingRonDecision=false;
+     pendingOpponentNext=null;
+     if(wall.length===0){
+       finished=true;
+       $('playMessage').className='message';
+       $('playMessage').textContent='全員の捨て牌が18枚になり、流局です。「新しい一局」で再挑戦しましょう。';
+     }else{
+       $('playMessage').className='message';
+       $('playMessage').textContent='下家まで打ちました。次の牌をツモってください。';
+     }
+     renderPlay();
+     return;
+   }
+   const actor=turns[index++];
+   const tile=opponentWall.shift();
+   actor.river.push(tile);
+   lastOpponentTile=tile;
+   lastOpponentName=actor.name;
+   awaitingRonDecision=true;
+   pendingOpponentNext=()=>{
+     awaitingRonDecision=false;
+     pendingOpponentNext=null;
+     renderPlay();
+     setTimeout(next,180);
+   };
+   $('playMessage').className='message';
+   $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。手牌を見て、自分で判断してください。`;
+   renderPlay();
+ };
+ next();
+}
+function passRon(){
+ if(!awaitingRonDecision||!pendingOpponentNext){
+   $('playMessage').className='message';
+   $('playMessage').textContent='今は見送る相手の捨て牌がありません。';
+   return;
+ }
+ const go=pendingOpponentNext;
+ $('playMessage').className='message';
+ $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}を見送りました。`;
+ go();
+}
+function declareRon(){
+ if(!sc||finished)return;
+ if(!awaitingRonDecision||lastOpponentTile===null){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='今はロンできる捨て牌がありません。';
+   return;
+ }
+ const completed=[...hand,lastOpponentTile];
+ if(!isWinningHand(completed)){
+   $('playMessage').className='message error';
+   $('playMessage').textContent=`誤ロンです。${lastOpponentName}の${labels[lastOpponentTile]}では和了形になりません。「見送る」で続けてください。`;
+   return;
+ }
+ const answer=actualHandAnswerData(completed,lastOpponentTile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,'ロン');
+ const realYaku=answer.yaku.filter(y=>!y.startsWith('ドラ'));
+ if(realYaku.length===0){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='形は完成していますが、ロンできる役がありません。「見送る」で続けてください。';
+   return;
+ }
+ hand=completed.sort((a,b)=>a-b);
+ currentWinType='ロン';
+ winningTile=lastOpponentTile;
+ currentDraw=null;
+ finished=true;
+ opponentsActing=false;
+ awaitingRonDecision=false;
+ pendingOpponentNext=null;
+ $('playAnswerTitle').textContent=`ロン和了！ ${lastOpponentName}から`;
+ $('playMessage').className='message win';
+ $('playMessage').textContent=`ロン成立！ ${lastOpponentName}の${labels[winningTile]}で和了しました。役と点数を答えてください。`;
+ $('playAnswerPanel').classList.remove('hidden');
+ renderPlay();
+}
+
+function discardTile(i){
+ if(!awaitingDiscard||finished)return;
+ const t=hand.splice(i,1)[0];discards.push(t);hand.sort((a,b)=>a-b);
+ const wasRiichiDeclaration=riichiJustDeclared;
+ const validRiichi=wasRiichiDeclaration&&isTenpai(hand);
+ drawnIndex=-1;currentDraw=null;awaitingDiscard=false;riichiJustDeclared=false;
+ if(wasRiichiDeclaration){
+   if(validRiichi){
+     riichi=true;
+     $('playMessage').className='message win';
+     $('playMessage').textContent=`${labels[t]}を切って、リーチ成立です。次をツモってください。`;
+   }else{
+     $('playMessage').className='message error';
+     $('playMessage').textContent=`誤リーチです。捨てた後の13枚はテンパイしていません。リーチは成立せず、このまま続けます。`;
+   }
+ }else{
+   $('playMessage').className='message';
+   $('playMessage').textContent=`${labels[t]}を切りました。他家の捨て牌を待ちます。`;
+ }
+ renderPlay();
+ playOpponentTurns();
+}
+function playReveal(correct){
+ const a=playAnswerData();
+ const r=$('playResult');r.className='result show '+(correct?'correct':'wrong');
+ const doraNote=a.doraCount?`ドラ表示は${labels[sc.dora]}、ドラは${labels[doraFromIndicator(sc.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
+ const judgeNote=a.waits?`待ちの判定：${a.waits.join('／')}。三色とピンフは、実際の14枚から判定しています。`:'';
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${currentWinType}和了：${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
+}
+function requestNewRound(){
+ if(sc&&!finished&&(turn>0||discards.length>0)){
+   if(!confirm('現在の一局を終了して、新しい一局を始めますか？'))return;
+ }
+ startRound();
+}
+function declareTsumo(){
+ if(awaitingRonDecision){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='他家が捨てた牌なので、ツモではありません。';
+   return;
+ }
+ if(!sc){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='先に「新しい一局」を押してください。';
+   return;
+ }
+ if(finished){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='この一局は終了しています。「新しい一局」を押してください。';
+   return;
+ }
+ if(!awaitingDiscard){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='誤ツモです。まだ牌をツモっていません。';
+   return;
+ }
+ if(isWinningHand(hand)){
+   finished=true;awaitingDiscard=false;
+   currentWinType='ツモ';
+   winningTile=currentDraw;
+   $('playAnswerTitle').textContent='ツモ和了！ 声に出して答えましょう';
+   $('playMessage').className='message win';
+   $('playMessage').textContent='ツモ成立！ 役と点数を声に出してから入力してください。';
+   $('playAnswerPanel').classList.remove('hidden');
+ }else{
+   $('playMessage').className='message error';
+   $('playMessage').textContent='誤ツモです。現在の14枚は和了形ではありません。手牌を見直して1枚切りましょう。';
+ }
+ renderPlay();
+}
+$('newRoundBtn').onclick=requestNewRound;$('playNext').onclick=startRound;$('drawBtn').onclick=drawTile;
+$('sortBtn').onclick=()=>{
+ hand.sort((a,b)=>a-b);
+ drawnIndex=currentDraw===null?-1:hand.lastIndexOf(currentDraw);
+ renderPlay();
+};
+$('riichiBtn').onclick=()=>{
+ if(awaitingRonDecision){
+   $('playMessage').className='message';
+   $('playMessage').textContent='今は他家の捨て牌に対する判断中です。';
+   return;
+ }
+ if(!sc){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='先に「新しい一局」を押してください。';
+   return;
+ }
+ if(finished){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='この一局は終了しています。';
+   return;
+ }
+ if(riichi){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='すでにリーチを宣言しています。';
+   return;
+ }
+ if(!awaitingDiscard){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='今はリーチ宣言できません。まず1枚ツモって14枚にしてください。';
+   return;
+ }
+ riichiJustDeclared=true;
+ $('playMessage').className='message';
+ $('playMessage').textContent='「リーチ」と宣言しました。リーチ牌を1枚選んで捨ててください。';
+ renderPlay();
+};
+$('tsumoBtn').onclick=declareTsumo;
+$('ronBtn').onclick=declareRon;
+$('passBtn').onclick=passRon;
+['ponBtn','chiBtn','kanBtn'].forEach(id=>$(id).onclick=()=>alert('この機能はVer.1.8.3以降で追加予定です。'));
+
+function spokenNumberToDigits(text){
+ const simple={
+  '一万六千':'16000','一万二千':'12000','四万八千':'48000','三万二千':'32000',
+  '二万四千':'24000','一万':'10000','九千':'9000','八千':'8000','七千':'7000',
+  '六千':'6000','五千':'5000','四千':'4000','三千':'3000','二千':'2000','千':'1000'
+ };
+ let out=text;
+ Object.entries(simple).forEach(([k,v])=>{out=out.replaceAll(k,v)});
+ return out;
+}
+function splitSpokenAnswer(raw){
+ let text=spokenNumberToDigits(raw)
+   .replace(/[，,]/g,'')
+   .replace(/点/g,'')
+   .replace(/\s+/g,' ')
+   .trim();
+
+ const pointMatches=[...text.matchAll(/(?:^|[\s、。・])(\d{3,5})(?=$|[\s、。・]|オール)/g)].map(m=>m[1]);
+ let points='';
+ if(/オール/.test(text)&&pointMatches.length){
+   points=`${pointMatches[pointMatches.length-1]}オール`;
+ }else if(pointMatches.length>=2){
+   points=`${pointMatches[pointMatches.length-2]}/${pointMatches[pointMatches.length-1]}`;
+ }else if(pointMatches.length===1){
+   points=pointMatches[0];
+ }
+
+ let yaku=text
+   .replace(/\d{3,5}\s*オール/g,'')
+   .replace(/(?:^|[\s、。・])\d{3,5}(?=$|[\s、。・])/g,' ')
+   .replace(/オール/g,'')
+   .replace(/[。]/g,'')
+   .replace(/[\s、]+/g,'・')
+   .replace(/・+/g,'・')
+   .replace(/^・|・$/g,'');
+
+ return {yaku,points};
+}
+function startVoiceAnswer(yakuId,pointsId,statusId,buttonId){
+ const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ const status=$(statusId),button=$(buttonId);
+ if(!Recognition){
+   status.className='voice-status error';
+   status.textContent='このブラウザでは直接の音声認識が使えません。入力欄を選び、MacやiPhoneの音声入力をご利用ください。';
+   return;
+ }
+ const recognition=new Recognition();
+ recognition.lang='ja-JP';
+ recognition.interimResults=false;
+ recognition.continuous=false;
+
+ recognition.onstart=()=>{
+   status.className='voice-status listening';
+   status.textContent='聞いています…役と点数を続けて話してください。';
+   button.classList.add('mic-listening');
+ };
+ recognition.onresult=e=>{
+   const transcript=e.results[0][0].transcript;
+   const parsed=splitSpokenAnswer(transcript);
+   $(yakuId).value=parsed.yaku;
+   $(pointsId).value=parsed.points;
+   status.className='voice-status';
+   status.textContent=`聞き取り：${transcript}`;
+ };
+ recognition.onerror=e=>{
+   status.className='voice-status error';
+   status.textContent=e.error==='not-allowed'
+     ? 'マイクが許可されていません。Chromeのマイク使用を許可してください。'
+     : 'うまく聞き取れませんでした。もう一度、ゆっくり話してください。';
+ };
+ recognition.onend=()=>button.classList.remove('mic-listening');
+
+ try{recognition.start()}
+ catch(_){
+   status.className='voice-status error';
+   status.textContent='マイクを開始できませんでした。少し待ってから、もう一度押してください。';
+ }
+}
+$('playMic').onclick=()=>startVoiceAnswer('playYaku','playPoints','playVoiceStatus','playMic');
+$('playShow').onclick=()=>playReveal(false);
+$('playCheck').onclick=()=>{
+ const y=norm($('playYaku').value),p=norm($('playPoints').value);
+ const a=playAnswerData();
+ playReveal(answerYakuMatches($('playYaku').value,a.yaku)&&p===norm(a.points));
+};
+
+let quizIndex=0,quizCorrect=0,quizStreak=0;
+function loadQuiz(){
+ const q=scenarios[quizIndex%scenarios.length];
+ $('quizHand').innerHTML='';
+ [...q.hand,q.win].sort((a,b)=>a-b).forEach((t,i)=>{
+   const b=renderTile(t,i,false);
+   if(t===q.win)b.classList.add('drawn');
+   $('quizHand').appendChild(b);
+ });
+ $('quizNo').textContent=quizIndex+1;$('quizCorrect').textContent=quizCorrect;$('quizStreak').textContent=quizStreak;
+ $('quizDealer').textContent=q.dealer;$('quizWinType').textContent='ツモ';
+ $('quizYaku').value='';$('quizPoints').value='';
+ $('quizVoiceStatus').className='voice-status';$('quizVoiceStatus').textContent='役と点数を一息で話せます。手入力もできます。';
+ $('quizResult').className='result';
+}
+function quizReveal(correct){
+ const q=scenarios[quizIndex%scenarios.length],a=scenarioAnswerData(q),r=$('quizResult');
+ r.className='result show '+(correct?'correct':'wrong');
+ const doraNote=a.doraCount?`ドラ表示は${labels[q.dora]}、ドラは${labels[doraFromIndicator(q.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
+ const judgeNote=a.waits?`待ちの判定：${a.waits.join('／')}。三色とピンフは、実際の14枚から判定しています。`:'';
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
+}
+$('quizCheck').onclick=()=>{
+ const q=scenarios[quizIndex%scenarios.length],a=scenarioAnswerData(q),y=norm($('quizYaku').value),p=norm($('quizPoints').value);
+ const ok=answerYakuMatches($('quizYaku').value,a.yaku)&&p===norm(a.points);
+ if(ok){quizCorrect++;quizStreak++;}else quizStreak=0;
+ $('quizCorrect').textContent=quizCorrect;$('quizStreak').textContent=quizStreak;quizReveal(ok);
+};
+$('quizMic').onclick=()=>startVoiceAnswer('quizYaku','quizPoints','quizVoiceStatus','quizMic');
+$('quizShow').onclick=()=>quizReveal(false);
+$('quizNext').onclick=()=>{quizIndex++;loadQuiz()};
+
+function setMode(mode){
+ const play=mode==='play';
+ $('playMode').classList.toggle('hidden',!play);$('quizMode').classList.toggle('hidden',play);
+ $('modePlay').classList.toggle('active',play);$('modeQuiz').classList.toggle('active',!play);
+}
+$('modePlay').onclick=()=>setMode('play');$('modeQuiz').onclick=()=>setMode('quiz');
+
+renderPlay();loadQuiz();setMode('play');
+</script>
+</body>
+</html>
