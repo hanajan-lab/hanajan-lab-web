@@ -110,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.8.1　スマホ横スクロール修正版</p>
+<p class="sub" style="font-weight:700">Ver.1.8.2　他家打牌・自動進行版</p>
 </header>
 
 <section class="panel">
@@ -522,7 +522,14 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,opponentAutoTimer=null,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+
+function clearOpponentAutoTimer(){
+ if(opponentAutoTimer!==null){
+   clearTimeout(opponentAutoTimer);
+   opponentAutoTimer=null;
+ }
+}
 
 function renderTile(t,i,clickable){
  const b=document.createElement('button');
@@ -555,6 +562,7 @@ function renderPlay(){
  $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
 }
 function startRound(){
+ clearOpponentAutoTimer();
  sc=scenarios[Math.floor(Math.random()*scenarios.length)];
  hand=[...sc.hand].sort((a,b)=>a-b);
  // 一人用モードでは、実戦で一人がツモる回数に近い18回分を用意します。
@@ -632,6 +640,7 @@ function playOpponentTurns(){
    lastOpponentName=actor.name;
    awaitingRonDecision=true;
    pendingOpponentNext=()=>{
+     clearOpponentAutoTimer();
      awaitingRonDecision=false;
      pendingOpponentNext=null;
      renderPlay();
@@ -640,18 +649,27 @@ function playOpponentTurns(){
    $('playMessage').className='message';
    $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。手牌を見て、自分で判断してください。`;
    renderPlay();
+   clearOpponentAutoTimer();
+   opponentAutoTimer=setTimeout(()=>{
+     if(awaitingRonDecision&&pendingOpponentNext){
+       const go=pendingOpponentNext;
+       $('playMessage').className='message';
+       $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}は自動で次へ進みました。`;
+       go();
+     }
+   },2500);
  };
  next();
 }
 function passRon(){
  if(!awaitingRonDecision||!pendingOpponentNext){
    $('playMessage').className='message';
-   $('playMessage').textContent='今は見送る相手の捨て牌がありません。';
+   $('playMessage').textContent='今は「次へ」で進める相手の捨て牌がありません。';
    return;
  }
  const go=pendingOpponentNext;
  $('playMessage').className='message';
- $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}を見送りました。`;
+ $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}から次へ進みます。`;
  go();
 }
 function declareRon(){
@@ -664,20 +682,21 @@ function declareRon(){
  const completed=[...hand,lastOpponentTile];
  if(!isWinningHand(completed)){
    $('playMessage').className='message error';
-   $('playMessage').textContent=`誤ロンです。${lastOpponentName}の${labels[lastOpponentTile]}では和了形になりません。「見送る」で続けてください。`;
+   $('playMessage').textContent=`誤ロンです。${lastOpponentName}の${labels[lastOpponentTile]}では和了形になりません。「次へ」で続けてください。`;
    return;
  }
  const answer=actualHandAnswerData(completed,lastOpponentTile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,'ロン');
  const realYaku=answer.yaku.filter(y=>!y.startsWith('ドラ'));
  if(realYaku.length===0){
    $('playMessage').className='message error';
-   $('playMessage').textContent='形は完成していますが、ロンできる役がありません。「見送る」で続けてください。';
+   $('playMessage').textContent='形は完成していますが、ロンできる役がありません。「次へ」で続けてください。';
    return;
  }
  hand=completed.sort((a,b)=>a-b);
  currentWinType='ロン';
  winningTile=lastOpponentTile;
  currentDraw=null;
+ clearOpponentAutoTimer();
  finished=true;
  opponentsActing=false;
  awaitingRonDecision=false;
