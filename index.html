@@ -1,4 +1,4 @@
-<!-- Verified build: Ver.1.8.9 yakuhai-fix -->
+<!-- Verified build: Ver.1.9.0 furiten -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -115,7 +115,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.8.9　役牌判定修正版</p>
+<p class="sub" style="font-weight:700">Ver.1.9.0　フリテン実装版</p>
 </header>
 
 <section class="panel">
@@ -557,13 +557,42 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,sameTurnFuriten=false,riichiFuriten=false;
 
 function clearOpponentAutoTimer(){
  if(opponentAutoTimer!==null){
    clearTimeout(opponentAutoTimer);
    opponentAutoTimer=null;
  }
+}
+
+// 現在の手牌で、役があってロン和了できる牌をすべて調べます。
+// 画面には表示せず、フリテン判定のためだけに使います。
+function ronWinningTiles(){
+ if(!sc)return [];
+ const counts=tileCounts([...hand,...openMelds.flatMap(m=>m.tiles||[])]);
+ const wins=[];
+ for(let tile=0;tile<34;tile++){
+   if(counts[tile]>=4)continue;
+   const completed=[...hand,tile];
+   if(!isWinningHand(completed,openMelds.length))continue;
+   const answer=actualHandAnswerData(completed,tile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,'ロン',openMelds);
+   const realYaku=answer.yaku.filter(y=>!y.startsWith('ドラ'));
+   if(realYaku.length>0)wins.push(tile);
+ }
+ return wins;
+}
+function isDiscardFuriten(){
+ const waits=ronWinningTiles();
+ return waits.some(tile=>discards.includes(tile));
+}
+function currentDiscardIsRonOpportunity(){
+ return awaitingRonDecision&&lastOpponentTile!==null&&ronWinningTiles().includes(lastOpponentTile);
+}
+function recordMissedRon(){
+ if(!currentDiscardIsRonOpportunity())return;
+ if(riichi)riichiFuriten=true;
+ else sameTurnFuriten=true;
 }
 function showCallAnnouncement(text){
  const el=$('callAnnouncement');
@@ -628,7 +657,7 @@ function startRound(){
  wall.forEach(removeOne);
  opponentWall=shuffle([...pool]).slice(0,54);
  discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];openMelds=[];
- drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
+ drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;sameTurnFuriten=false;riichiFuriten=false;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。残りツモは18回です。「1枚ツモる」を押してください。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
@@ -649,7 +678,7 @@ function drawTile(){
    return;
  }
  if(opponentsActing||wall.length===0)return;
- const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;currentDraw=t;awaitingDiscard=true;turn++;riichiJustDeclared=false;
+ const t=wall.shift();hand.push(t);drawnIndex=hand.length-1;currentDraw=t;awaitingDiscard=true;turn++;riichiJustDeclared=false;sameTurnFuriten=false;
  $('playMessage').className='message';
  $('playMessage').textContent=`${labels[t]}をツモりました。和了なら「ツモ！」、違えば切る牌を選んでください。`;
  renderPlay();
@@ -697,6 +726,7 @@ function playOpponentTurns(){
    clearOpponentAutoTimer();
    opponentAutoTimer=setTimeout(()=>{
      if(awaitingRonDecision&&pendingOpponentNext){
+       recordMissedRon();
        const go=pendingOpponentNext;
        $('playMessage').className='message';
        $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}は自動で次へ進みました。`;
@@ -712,6 +742,7 @@ function passRon(){
    $('playMessage').textContent='今は「次へ」で進める相手の捨て牌がありません。';
    return;
  }
+ recordMissedRon();
  const go=pendingOpponentNext;
  $('playMessage').className='message';
  $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}から次へ進みます。`;
@@ -746,6 +777,21 @@ function declareRonCore(){
  if(realYaku.length===0){
    $('playMessage').className='message error';
    $('playMessage').textContent='形は完成していますが、ロンできる役がありません。「次へ」で続けてください。';
+   return;
+ }
+ if(isDiscardFuriten()){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='フリテンです。現在の待ち牌の中に、自分が以前捨てた牌があるためロンできません。ツモ和了はできます。「次へ」で続けてください。';
+   return;
+ }
+ if(riichiFuriten){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='リーチ後にロン牌を見逃しているため、この局はフリテンです。ロンできませんが、ツモ和了はできます。「次へ」で続けてください。';
+   return;
+ }
+ if(sameTurnFuriten){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='同巡フリテンです。先ほどロン牌を見逃したため、次に自分がツモるまでは待ち牌すべてでロンできません。「次へ」で続けてください。';
    return;
  }
  hand=completed.sort((a,b)=>a-b);
@@ -865,6 +911,7 @@ function declarePonCore(){
    $('playMessage').textContent=`誤ポンです。${labels[lastOpponentTile]}が手牌に2枚ありません。「次へ」で続けてください。`;
    return;
  }
+ recordMissedRon();
  clearOpponentAutoTimer();
  const tile=lastOpponentTile;
  for(const i of matches.slice(0,2).sort((a,b)=>b-a))hand.splice(i,1);
@@ -966,6 +1013,7 @@ function declareKanCore(){
    $('playMessage').textContent='嶺上牌を引ける牌が残っていないため、カンできません。';
    return;
  }
+ recordMissedRon();
  clearOpponentAutoTimer();
  const tile=lastOpponentTile;
  for(const i of matches.slice(0,3).sort((a,b)=>b-a))hand.splice(i,1);
@@ -1053,6 +1101,7 @@ function declareChiCore(){
    }
    chosen=options[n];
  }
+ recordMissedRon();
  clearOpponentAutoTimer();
  for(const tile of chosen.needed){
    const i=hand.indexOf(tile);
