@@ -110,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.5　河6枚並び版</p>
+<p class="sub" style="font-weight:700">Ver.1.6　役の自動判定版</p>
 </header>
 
 <section class="panel">
@@ -303,6 +303,167 @@ function countDora(tiles,indicator){
  const dora=doraFromIndicator(indicator);
  return tiles.filter(t=>t===dora).length;
 }
+function getStandardDecompositions(tiles){
+ const results=[];
+ if(tiles.length!==14)return results;
+ const counts=tileCounts(tiles);
+
+ function takeMelds(c,melds){
+   const i=c.findIndex(n=>n>0);
+   if(i===-1){
+     results.push({pair:currentPair,melds:[...melds]});
+     return;
+   }
+   if(c[i]>=3){
+     c[i]-=3;
+     melds.push({type:'triplet',tile:i});
+     takeMelds(c,melds);
+     melds.pop();
+     c[i]+=3;
+   }
+   if(i<27&&i%9<=6&&c[i+1]>0&&c[i+2]>0){
+     c[i]--;c[i+1]--;c[i+2]--;
+     melds.push({type:'sequence',start:i});
+     takeMelds(c,melds);
+     melds.pop();
+     c[i]++;c[i+1]++;c[i+2]++;
+   }
+ }
+
+ let currentPair=-1;
+ for(let p=0;p<34;p++){
+   if(counts[p]>=2){
+     const c=[...counts];
+     c[p]-=2;
+     currentPair=p;
+     takeMelds(c,[]);
+   }
+ }
+ return results;
+}
+function isTerminalOrHonor(t){
+ return t>=27||t%9===0||t%9===8;
+}
+function isValuePair(tile,round,seat){
+ if(tile>=31)return true;
+ const windMap={東:27,南:28,西:29,北:30};
+ return tile===windMap[round]||tile===windMap[seat];
+}
+function waitTypeForSequence(start,winTile){
+ if(winTile===start+1)return 'カンチャン';
+ if(winTile===start){
+   return start%9===6?'ペンチャン':'両面';
+ }
+ if(winTile===start+2){
+   return start%9===0?'ペンチャン':'両面';
+ }
+ return null;
+}
+function decompositionYakuAndFu(dec,tiles,winTile,round,seat){
+ const sequences=dec.melds.filter(m=>m.type==='sequence');
+ const triplets=dec.melds.filter(m=>m.type==='triplet');
+ const allSequences=sequences.length===4;
+ const tanyao=tiles.every(t=>!isTerminalOrHonor(t));
+
+ const starts=new Set(sequences.map(m=>m.start));
+ let sanshoku=false;
+ for(let rank=0;rank<=6;rank++){
+   if(starts.has(rank)&&starts.has(9+rank)&&starts.has(18+rank)){
+     sanshoku=true;
+     break;
+   }
+ }
+
+ const possibleWaits=[];
+ if(dec.pair===winTile)possibleWaits.push('単騎');
+ for(const m of sequences){
+   const w=waitTypeForSequence(m.start,winTile);
+   if(w)possibleWaits.push(w);
+ }
+ for(const m of triplets){
+   if(m.tile===winTile)possibleWaits.push('シャンポン');
+ }
+ if(!possibleWaits.length)possibleWaits.push('不明');
+
+ const pairIsValue=isValuePair(dec.pair,round,seat);
+ const hasRyanmen=possibleWaits.includes('両面');
+ const pinfu=allSequences&&!pairIsValue&&hasRyanmen;
+
+ const yaku=['ツモ'];
+ let han=1;
+ if(tanyao){yaku.push('タンヤオ');han+=1}
+ if(pinfu){yaku.push('ピンフ');han+=1}
+ if(sanshoku){yaku.push('三色');han+=2}
+
+ let fu;
+ if(pinfu){
+   fu=20;
+ }else{
+   let raw=20+2; // 基本符＋ツモ符
+   if(dec.pair>=31)raw+=2;
+   const windMap={東:27,南:28,西:29,北:30};
+   if(dec.pair===windMap[round])raw+=2;
+   if(dec.pair===windMap[seat])raw+=2;
+   for(const m of triplets){
+     raw+=isTerminalOrHonor(m.tile)?8:4; // 一人用はすべて暗刻
+   }
+   if(possibleWaits.some(w=>w==='単騎'||w==='カンチャン'||w==='ペンチャン'))raw+=2;
+   fu=Math.ceil(raw/10)*10;
+ }
+ return {yaku,han,fu,pinfu,sanshoku,tanyao,waits:possibleWaits};
+}
+function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicator,withRiichi=false){
+ const doraCount=countDora(tiles,doraIndicator);
+
+ if(isKokushi(tiles)){
+   return {yaku:['ツモ','国士無双'],han:13,fu:0,
+     points:dealer==='親'?'16000オール':'8000/16000',doraCount};
+ }
+ if(isSevenPairs(tiles)){
+   const yaku=['ツモ','七対子'];
+   let han=3;
+   if(tiles.every(t=>!isTerminalOrHonor(t))){yaku.push('タンヤオ');han++}
+   if(withRiichi){yaku.unshift('リーチ');han++}
+   if(doraCount){yaku.push(`ドラ${doraCount}`);han+=doraCount}
+   return {yaku,han,fu:25,points:tsumoPoints(han,25,dealer),doraCount};
+ }
+
+ const choices=getStandardDecompositions(tiles).map(dec=>
+   decompositionYakuAndFu(dec,tiles,winTile,round,seat)
+ );
+ if(!choices.length){
+   return {yaku:[],han:0,fu:0,points:'—',doraCount};
+ }
+
+ choices.sort((a,b)=>{
+   if(b.han!==a.han)return b.han-a.han;
+   return b.fu-a.fu;
+ });
+ const best=choices[0];
+ const yaku=[...best.yaku];
+ let han=best.han;
+ if(withRiichi){yaku.unshift('リーチ');han++}
+ if(doraCount>0){yaku.push(`ドラ${doraCount}`);han+=doraCount}
+ return {
+   yaku,han,fu:best.fu,
+   points:tsumoPoints(han,best.fu,dealer),
+   doraCount,
+   waits:best.waits
+ };
+}
+function answerYakuMatches(input,expected){
+ const normalized=norm(input);
+ const known=['リーチ','ツモ','タンヤオ','ピンフ','三色','七対子','国士無双'];
+ const found=[];
+ for(const name of known){
+   if(normalized.includes(norm(name)))found.push(name);
+ }
+ const doraMatch=normalized.match(/ドラ(\d+)/);
+ if(doraMatch)found.push(`ドラ${doraMatch[1]}`);
+ const a=[...new Set(found.map(norm))].sort();
+ const b=[...new Set(expected.map(norm))].sort();
+ return a.length===b.length&&a.every((v,i)=>v===b[i]);
+}
 function roundUp100(n){return Math.ceil(n/100)*100}
 function tsumoPoints(han,fu,dealer){
  let base;
@@ -321,20 +482,11 @@ function tsumoPoints(han,fu,dealer){
  return `${roundUp100(base)}/${roundUp100(base*2)}`;
 }
 function playAnswerData(){
- const doraCount=countDora(hand,sc.dora);
- const yaku=[...sc.yaku];
- if(riichi)yaku.unshift('リーチ');
- if(doraCount>0)yaku.push(`ドラ${doraCount}`);
- const han=sc.han+(riichi?1:0)+doraCount;
- return {yaku,han,fu:sc.fu,points:tsumoPoints(han,sc.fu,sc.dealer),doraCount};
+ return actualHandAnswerData(hand,currentDraw,sc.round,sc.seat,sc.dealer,sc.dora,riichi);
 }
 function scenarioAnswerData(q){
  const finalTiles=[...q.hand,q.win];
- const doraCount=countDora(finalTiles,q.dora);
- const yaku=[...q.yaku];
- if(doraCount>0)yaku.push(`ドラ${doraCount}`);
- const han=q.han+doraCount;
- return {yaku,han,fu:q.fu,points:tsumoPoints(han,q.fu,q.dealer),doraCount};
+ return actualHandAnswerData(finalTiles,q.win,q.round,q.seat,q.dealer,q.dora,false);
 }
 
 const scenarios=[
@@ -467,7 +619,8 @@ function playReveal(correct){
  const a=playAnswerData();
  const r=$('playResult');r.className='result show '+(correct?'correct':'wrong');
  const doraNote=a.doraCount?`ドラ表示は${labels[sc.dora]}、ドラは${labels[doraFromIndicator(sc.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
- r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}`;
+ const judgeNote=a.waits?`待ちの判定：${a.waits.join('／')}。三色とピンフは、実際の14枚から判定しています。`:'';
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
 }
 function requestNewRound(){
  if(sc&&!finished&&(turn>0||discards.length>0)){
@@ -619,7 +772,7 @@ $('playShow').onclick=()=>playReveal(false);
 $('playCheck').onclick=()=>{
  const y=norm($('playYaku').value),p=norm($('playPoints').value);
  const a=playAnswerData();
- playReveal(a.yaku.every(v=>y.includes(norm(v)))&&p===norm(a.points));
+ playReveal(answerYakuMatches($('playYaku').value,a.yaku)&&p===norm(a.points));
 };
 
 let quizIndex=0,quizCorrect=0,quizStreak=0;
@@ -641,11 +794,12 @@ function quizReveal(correct){
  const q=scenarios[quizIndex%scenarios.length],a=scenarioAnswerData(q),r=$('quizResult');
  r.className='result show '+(correct?'correct':'wrong');
  const doraNote=a.doraCount?`ドラ表示は${labels[q.dora]}、ドラは${labels[doraFromIndicator(q.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
- r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}`;
+ const judgeNote=a.waits?`待ちの判定：${a.waits.join('／')}。三色とピンフは、実際の14枚から判定しています。`:'';
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
 }
 $('quizCheck').onclick=()=>{
  const q=scenarios[quizIndex%scenarios.length],a=scenarioAnswerData(q),y=norm($('quizYaku').value),p=norm($('quizPoints').value);
- const ok=a.yaku.every(v=>y.includes(norm(v)))&&p===norm(a.points);
+ const ok=answerYakuMatches($('quizYaku').value,a.yaku)&&p===norm(a.points);
  if(ok){quizCorrect++;quizStreak++;}else quizStreak=0;
  $('quizCorrect').textContent=quizCorrect;$('quizStreak').textContent=quizStreak;quizReveal(ok);
 };
