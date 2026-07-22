@@ -44,19 +44,22 @@ button:disabled{opacity:.42;cursor:not-allowed}
 .warn{background:#fff7dd;color:#775100;border-color:#e4c96c}
 .hidden{display:none!important}
 #playHand,#quizHand{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;padding:10px 2px 14px}
-.tile{flex:0 0 60px;min-height:88px;padding:5px 2px;background:#fffdf5;border:1px solid #cfc4aa;border-radius:8px}
+.tile{flex:0 0 68px;min-height:100px;padding:7px 3px;background:#fffdf5;border:1px solid #cfc4aa;border-radius:9px}
 .tile.drawn{border:3px solid var(--pink);transform:translateY(-6px)}
 .tile.discardable:hover{transform:translateY(-5px)}
-.glyph{display:block;font-size:42px;line-height:1}
-.label{display:block;font-size:11px;margin-top:3px}
-.discards{display:flex;flex-wrap:wrap;gap:4px;min-height:46px}
+.glyph{display:block;font-size:50px;line-height:1}
+.label{display:block;font-size:13px;margin-top:5px;font-weight:700}
+.discards{display:flex;flex-wrap:wrap;gap:5px;min-height:54px}
 .river-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .river-box{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
 .river-box h3{font-size:15px;margin:0 0 8px;text-align:center}
 .river-box.me{border:2px solid var(--pink)}
 @media(max-width:640px){.river-grid{grid-template-columns:1fr}}
-.mini{width:38px;text-align:center;border:1px solid #ddd0b9;background:#fffdf5;border-radius:5px;padding:2px}
-.mini .glyph{font-size:26px}.mini .label{font-size:9px}
+.mini{width:43px;min-height:57px;text-align:center;border:1px solid #ddd0b9;background:#fffdf5;border-radius:6px;padding:3px 2px}
+.mini .glyph{font-size:31px}.mini .label{font-size:10px;margin-top:2px}
+.river-box.me .mini{width:47px;min-height:62px}
+.river-box.me .mini .glyph{font-size:35px}
+.river-box.me .mini .label{font-size:11px}
 .answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 label{font-size:14px;font-weight:700}
 input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}
@@ -73,8 +76,13 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
  .stats{grid-template-columns:repeat(3,1fr)}
  .quiz-meta{grid-template-columns:repeat(2,1fr)}
  .answer-grid{grid-template-columns:1fr}
- .tile{flex-basis:50px;min-height:76px}
- .glyph{font-size:34px}
+ .tile{flex-basis:57px;min-height:86px}
+ .glyph{font-size:41px}
+ .label{font-size:12px}
+ .mini{width:41px;min-height:55px}
+ .mini .glyph{font-size:30px}
+ .river-box.me .mini{width:45px;min-height:60px}
+ .river-box.me .mini .glyph{font-size:34px}
 }
 </style>
 </head>
@@ -83,7 +91,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.1　他家の捨て牌版</p>
+<p class="sub" style="font-weight:700">Ver.1.2　見やすい大きな牌版</p>
 </header>
 
 <section class="panel">
