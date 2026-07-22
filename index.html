@@ -110,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.6　役の自動判定版</p>
+<p class="sub" style="font-weight:700">Ver.1.7　ロン練習版</p>
 </header>
 
 <section class="panel">
@@ -144,6 +144,8 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
     <button id="sortBtn">並べ替え</button>
     <button id="riichiBtn" class="warn">リーチ宣言</button>
     <button id="tsumoBtn" class="good">ツモ！</button>
+    <button id="ronBtn" class="primary" disabled>ロン！</button>
+    <button id="passBtn" disabled>見送る</button>
   </div>
 </section>
 
@@ -176,7 +178,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 </section>
 
 <section id="playAnswerPanel" class="panel hidden">
-  <h2>和了！ 声に出して答えましょう</h2>
+  <h2 id="playAnswerTitle">和了！ 声に出して答えましょう</h2>
   <div class="answer-grid">
     <label>役<input id="playYaku" placeholder="リーチ・ツモ・タンヤオなど"></label>
     <label>点数<input id="playPoints" placeholder="1000/2000" inputmode="numeric"></label>
@@ -359,7 +361,7 @@ function waitTypeForSequence(start,winTile){
  }
  return null;
 }
-function decompositionYakuAndFu(dec,tiles,winTile,round,seat){
+function decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType='ツモ'){
  const sequences=dec.melds.filter(m=>m.type==='sequence');
  const triplets=dec.melds.filter(m=>m.type==='triplet');
  const allSequences=sequences.length===4;
@@ -389,47 +391,56 @@ function decompositionYakuAndFu(dec,tiles,winTile,round,seat){
  const hasRyanmen=possibleWaits.includes('両面');
  const pinfu=allSequences&&!pairIsValue&&hasRyanmen;
 
- const yaku=['ツモ'];
- let han=1;
+ const yaku=[];
+ let han=0;
+ if(winType==='ツモ'){yaku.push('ツモ');han+=1}
  if(tanyao){yaku.push('タンヤオ');han+=1}
  if(pinfu){yaku.push('ピンフ');han+=1}
  if(sanshoku){yaku.push('三色');han+=2}
 
  let fu;
  if(pinfu){
-   fu=20;
+   fu=winType==='ツモ'?20:30;
  }else{
-   let raw=20+2; // 基本符＋ツモ符
+   let raw=20+(winType==='ツモ'?2:10);
    if(dec.pair>=31)raw+=2;
    const windMap={東:27,南:28,西:29,北:30};
    if(dec.pair===windMap[round])raw+=2;
    if(dec.pair===windMap[seat])raw+=2;
    for(const m of triplets){
-     raw+=isTerminalOrHonor(m.tile)?8:4; // 一人用はすべて暗刻
+     const ronOpen=winType==='ロン'&&m.tile===winTile&&possibleWaits.includes('シャンポン');
+     if(isTerminalOrHonor(m.tile))raw+=ronOpen?4:8;
+     else raw+=ronOpen?2:4;
    }
    if(possibleWaits.some(w=>w==='単騎'||w==='カンチャン'||w==='ペンチャン'))raw+=2;
    fu=Math.ceil(raw/10)*10;
  }
  return {yaku,han,fu,pinfu,sanshoku,tanyao,waits:possibleWaits};
 }
-function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicator,withRiichi=false){
+function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicator,withRiichi=false,winType='ツモ'){
  const doraCount=countDora(tiles,doraIndicator);
+ const pointCalc=(han,fu)=>winType==='ツモ'?tsumoPoints(han,fu,dealer):ronPoints(han,fu,dealer);
 
  if(isKokushi(tiles)){
-   return {yaku:['ツモ','国士無双'],han:13,fu:0,
-     points:dealer==='親'?'16000オール':'8000/16000',doraCount};
+   const yaku=winType==='ツモ'?['ツモ','国士無双']:['国士無双'];
+   return {yaku,han:13,fu:0,
+     points:winType==='ツモ'
+       ?(dealer==='親'?'16000オール':'8000/16000')
+       :(dealer==='親'?'48000':'32000'),
+     doraCount};
  }
  if(isSevenPairs(tiles)){
-   const yaku=['ツモ','七対子'];
-   let han=3;
+   const yaku=['七対子'];
+   let han=2;
+   if(winType==='ツモ'){yaku.unshift('ツモ');han++}
    if(tiles.every(t=>!isTerminalOrHonor(t))){yaku.push('タンヤオ');han++}
    if(withRiichi){yaku.unshift('リーチ');han++}
    if(doraCount){yaku.push(`ドラ${doraCount}`);han+=doraCount}
-   return {yaku,han,fu:25,points:tsumoPoints(han,25,dealer),doraCount};
+   return {yaku,han,fu:25,points:pointCalc(han,25),doraCount};
  }
 
  const choices=getStandardDecompositions(tiles).map(dec=>
-   decompositionYakuAndFu(dec,tiles,winTile,round,seat)
+   decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType)
  );
  if(!choices.length){
    return {yaku:[],han:0,fu:0,points:'—',doraCount};
@@ -446,7 +457,7 @@ function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicator,with
  if(doraCount>0){yaku.push(`ドラ${doraCount}`);han+=doraCount}
  return {
    yaku,han,fu:best.fu,
-   points:tsumoPoints(han,best.fu,dealer),
+   points:pointCalc(han,best.fu),
    doraCount,
    waits:best.waits
  };
@@ -481,12 +492,24 @@ function tsumoPoints(han,fu,dealer){
  }
  return `${roundUp100(base)}/${roundUp100(base*2)}`;
 }
+function ronPoints(han,fu,dealer){
+ let base;
+ if(han>=13)base=8000;
+ else if(han>=11)base=6000;
+ else if(han>=8)base=4000;
+ else if(han>=6)base=3000;
+ else{
+   base=fu*Math.pow(2,han+2);
+   if(han>=5||base>=2000)base=2000;
+ }
+ return `${roundUp100(base*(dealer==='親'?6:4))}`;
+}
 function playAnswerData(){
- return actualHandAnswerData(hand,currentDraw,sc.round,sc.seat,sc.dealer,sc.dora,riichi);
+ return actualHandAnswerData(hand,winningTile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,currentWinType);
 }
 function scenarioAnswerData(q){
  const finalTiles=[...q.hand,q.win];
- return actualHandAnswerData(finalTiles,q.win,q.round,q.seat,q.dealer,q.dora,false);
+ return actualHandAnswerData(finalTiles,q.win,q.round,q.seat,q.dealer,q.dora,false,'ツモ');
 }
 
 const scenarios=[
@@ -496,7 +519,7 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],drawnIndex=-1,currentDraw=null,awaitingDiscard=false,opponentsActing=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
+let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,finished=false,turn=0,riichi=false,riichiJustDeclared=false;
 
 function renderTile(t,i,clickable){
  const b=document.createElement('button');
@@ -520,8 +543,10 @@ function renderPlay(){
  $('shimochaDiscards').innerHTML=riverHtml(shimochaDiscards);
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
  $('drawBtn').disabled=!sc||awaitingDiscard||opponentsActing||finished||wall.length===0;
- $('riichiBtn').disabled=opponentsActing;
- $('tsumoBtn').disabled=opponentsActing;
+ $('riichiBtn').disabled=opponentsActing||finished;
+ $('tsumoBtn').disabled=opponentsActing||finished;
+ $('ronBtn').disabled=!awaitingRonDecision||finished;
+ $('passBtn').disabled=!awaitingRonDecision||finished;
  $('riichiBtn').textContent=riichi?'リーチ宣言済み':'リーチ宣言';
 }
 function startRound(){
@@ -545,7 +570,7 @@ function startRound(){
  wall.forEach(removeOne);
  opponentWall=shuffle([...pool]).slice(0,54);
  discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];
- drawnIndex=-1;currentDraw=null;awaitingDiscard=false;opponentsActing=false;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
+ drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。残りツモは18回です。「1枚ツモる」を押してください。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
@@ -571,6 +596,8 @@ function playOpponentTurns(){
  const next=()=>{
    if(index>=turns.length){
      opponentsActing=false;
+     awaitingRonDecision=false;
+     pendingOpponentNext=null;
      if(wall.length===0){
        finished=true;
        $('playMessage').className='message';
@@ -585,12 +612,61 @@ function playOpponentTurns(){
    const actor=turns[index++];
    const tile=opponentWall.shift();
    actor.river.push(tile);
+   lastOpponentTile=tile;
+   lastOpponentName=actor.name;
+   awaitingRonDecision=true;
+   pendingOpponentNext=()=>{
+     awaitingRonDecision=false;
+     pendingOpponentNext=null;
+     renderPlay();
+     setTimeout(next,180);
+   };
    $('playMessage').className='message';
-   $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。`;
+   $('playMessage').textContent=`${actor.name}が${labels[tile]}を切りました。ロンなら「ロン！」、違えば「見送る」を押してください。`;
    renderPlay();
-   setTimeout(next,450);
  };
  next();
+}
+function passRon(){
+ if(!awaitingRonDecision||!pendingOpponentNext)return;
+ const go=pendingOpponentNext;
+ $('playMessage').className='message';
+ $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}を見送りました。`;
+ go();
+}
+function declareRon(){
+ if(!sc||finished)return;
+ if(!awaitingRonDecision||lastOpponentTile===null){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='今はロンできる捨て牌がありません。';
+   return;
+ }
+ const completed=[...hand,lastOpponentTile];
+ if(!isWinningHand(completed)){
+   $('playMessage').className='message error';
+   $('playMessage').textContent=`誤ロンです。${lastOpponentName}の${labels[lastOpponentTile]}では和了形になりません。「見送る」で続けてください。`;
+   return;
+ }
+ const answer=actualHandAnswerData(completed,lastOpponentTile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,'ロン');
+ const realYaku=answer.yaku.filter(y=>!y.startsWith('ドラ'));
+ if(realYaku.length===0){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='形は完成していますが、ロンできる役がありません。「見送る」で続けてください。';
+   return;
+ }
+ hand=completed.sort((a,b)=>a-b);
+ currentWinType='ロン';
+ winningTile=lastOpponentTile;
+ currentDraw=null;
+ finished=true;
+ opponentsActing=false;
+ awaitingRonDecision=false;
+ pendingOpponentNext=null;
+ $('playAnswerTitle').textContent=`ロン和了！ ${lastOpponentName}から`;
+ $('playMessage').className='message win';
+ $('playMessage').textContent=`ロン成立！ ${lastOpponentName}の${labels[winningTile]}で和了しました。役と点数を答えてください。`;
+ $('playAnswerPanel').classList.remove('hidden');
+ renderPlay();
 }
 
 function discardTile(i){
@@ -620,7 +696,7 @@ function playReveal(correct){
  const r=$('playResult');r.className='result show '+(correct?'correct':'wrong');
  const doraNote=a.doraCount?`ドラ表示は${labels[sc.dora]}、ドラは${labels[doraFromIndicator(sc.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
  const judgeNote=a.waits?`待ちの判定：${a.waits.join('／')}。三色とピンフは、実際の14枚から判定しています。`:'';
- r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
+ r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${currentWinType}和了：${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
 }
 function requestNewRound(){
  if(sc&&!finished&&(turn>0||discards.length>0)){
@@ -646,6 +722,9 @@ function declareTsumo(){
  }
  if(isWinningHand(hand)){
    finished=true;awaitingDiscard=false;
+   currentWinType='ツモ';
+   winningTile=currentDraw;
+   $('playAnswerTitle').textContent='ツモ和了！ 声に出して答えましょう';
    $('playMessage').className='message win';
    $('playMessage').textContent='ツモ成立！ 役と点数を声に出してから入力してください。';
    $('playAnswerPanel').classList.remove('hidden');
@@ -688,6 +767,8 @@ $('riichiBtn').onclick=()=>{
  renderPlay();
 };
 $('tsumoBtn').onclick=declareTsumo;
+$('ronBtn').onclick=declareRon;
+$('passBtn').onclick=passRon;
 
 function spokenNumberToDigits(text){
  const simple={
