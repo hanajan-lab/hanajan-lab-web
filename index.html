@@ -31,6 +31,8 @@ h2{margin:0 0 10px}
 button{border:1px solid var(--line);border-radius:12px;background:#fff;padding:11px 16px;font-size:16px;font-weight:700;cursor:pointer}
 button:hover:not(:disabled){transform:translateY(-1px)}
 button:disabled{opacity:.42;cursor:not-allowed}
+.tile:disabled{opacity:1;color:var(--ink);cursor:default}
+.tile:disabled:hover{transform:none}
 .primary{background:var(--pink);color:#fff;border-color:var(--pink)}
 .blue{background:var(--blue);color:#fff;border-color:var(--blue)}
 .good{background:var(--green);color:#fff;border-color:var(--green)}
@@ -108,7 +110,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 
 <section class="panel">
   <h2>手牌</h2>
-  <p class="note">ツモったら、切りたい牌をクリックします。赤い枠がツモ牌です。</p>
+  <p class="note">ツモったら、切りたい牌をクリックします。赤い枠がツモ牌です。捨てた後も手牌は濃く表示されます。</p>
   <div id="playHand"></div>
 </section>
 
