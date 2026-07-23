@@ -1,4 +1,4 @@
-<!-- Verified build: Ver.1.12.0 all kan types / rinshan / kan dora -->
+<!-- Verified build: Ver.1.12.1 kan-friendly deal / mixed initial hand / 3-step sorting -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -177,7 +177,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.12.0　カン・嶺上牌・カンドラ対応版</p>
+<p class="sub" style="font-weight:700">Ver.1.12.1　カン練習配牌・3段階並べ替え対応版</p>
 </header>
 
 <section class="panel">
@@ -624,6 +624,11 @@ function scenarioAnswerData(q){
  return actualHandAnswerData(finalTiles,q.win,q.round,q.seat,q.dealer,q.dora,false,'ツモ');
 }
 
+const kanPracticeScenario={
+ hand:[T.m(5),T.m(5),T.m(5),T.m(5),T.m(2),T.m(3),T.m(4),T.p(3),T.p(4),T.p(5),T.s(6),T.s(7),T.E],
+ win:T.s(8),firstDraw:T.p(9),rinshan:T.E,round:'東',seat:'南',dealer:'子',dora:T.p(1),kanPractice:true
+};
+
 const scenarios=[
  {hand:[T.m(2),T.m(3),T.m(4),T.m(4),T.m(5),T.m(6),T.p(3),T.p(4),T.p(5),T.s(4),T.s(5),T.s(6),T.p(7)],win:T.p(7),round:'東',seat:'南',dealer:'子',dora:T.m(3),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'子の3翻20符ツモ。'},
  {hand:[T.m(1),T.m(2),T.m(3),T.m(4),T.m(5),T.m(6),T.p(2),T.p(3),T.p(4),T.s(7),T.s(8),T.s(9),T.E],win:T.E,round:'東',seat:'東',dealer:'親',dora:T.s(6),yaku:['ツモ'],han:1,fu:30,points:'500オール',note:'親のツモのみ。'},
@@ -631,7 +636,7 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],deadWallIndicators=[],visibleDoraIndicators=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,riichiDiscardIndex=-1,sameTurnFuriten=false,riichiFuriten=false;
+let sc=null,hand=[],wall=[],opponentWall=[],deadWallIndicators=[],visibleDoraIndicators=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,riichiDiscardIndex=-1,sameTurnFuriten=false,riichiFuriten=false,sortStage=0,roundSequenceCount=0;
 
 function clearOpponentAutoTimer(){
  if(opponentAutoTimer!==null){
@@ -767,8 +772,14 @@ function renderPlay(){
 }
 function startRound(){
  clearOpponentAutoTimer();
- sc=scenarios[Math.floor(Math.random()*scenarios.length)];
- hand=[...sc.hand].sort((a,b)=>a-b);
+ // 最初の一局は必ずカンを試せる配牌。その後も3局に1回はカン練習配牌にします。
+ const useKanPractice=roundSequenceCount===0||roundSequenceCount%3===0;
+ sc=useKanPractice?kanPracticeScenario:scenarios[Math.floor(Math.random()*scenarios.length)];
+ roundSequenceCount++;
+ // 実戦と同じように、配牌は最初から種類・数字を混在させます。
+ hand=shuffle([...sc.hand]);
+ sortStage=0;
+ $('sortBtn').textContent='並べ替え（1/3）';
  // 一人用モードでは、実戦で一人がツモる回数に近い18回分を用意します。
  const pool=[];
  for(let t=0;t<34;t++)for(let n=0;n<4;n++)pool.push(t);
@@ -779,17 +790,28 @@ function startRound(){
  hand.forEach(removeOne);
  removeOne(sc.dora); // ドラ表示牌は王牌側
  removeOne(sc.win);  // 和了牌1枚を後で山に入れる
+ if(sc.kanPractice){
+   removeOne(sc.firstDraw);
+   removeOne(sc.rinshan);
+ }
  shuffle(pool);
  deadWallIndicators=pool.splice(0,4);
  visibleDoraIndicators=[sc.dora];
- wall=pool.slice(0,17);
- const winPosition=5+Math.floor(Math.random()*13); // 6～18巡目
- wall.splice(winPosition,0,sc.win);
+ if(sc.kanPractice){
+   // 1枚目をツモった直後に暗槓でき、嶺上牌の後にも和了へ進める並びです。
+   wall=[sc.firstDraw,sc.rinshan,...pool.slice(0,15)];
+   const winPosition=5+Math.floor(Math.random()*9); // 嶺上牌より後に置く
+   wall.splice(winPosition,0,sc.win);
+ }else{
+   wall=pool.slice(0,17);
+   const winPosition=5+Math.floor(Math.random()*13); // 6～18巡目
+   wall.splice(winPosition,0,sc.win);
+ }
  // 自分の山に使った牌を除き、残りから他家3人の捨て牌を用意します。
  wall.forEach(removeOne);
  opponentWall=shuffle([...pool]).slice(0,54);
  discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];openMelds=[];
- drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;riichiDiscardIndex=-1;sameTurnFuriten=false;riichiFuriten=false;
+ drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;riichiDiscardIndex=-1;sameTurnFuriten=false;riichiFuriten=false;sortStage=0;
  $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=visibleDoraIndicators.map(t=>glyphs[t]).join(' ');
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。親から対局を始めます。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
@@ -1140,8 +1162,36 @@ function declarePonCore(){
 
 $('newRoundBtn').onclick=requestNewRound;$('playNext').onclick=startRound;$('drawBtn').onclick=drawTile;
 $('sortBtn').onclick=()=>{
- hand.sort((a,b)=>a-b);
+ if(!hand.length)return;
+ sortStage=Math.min(sortStage+1,3);
+ const originalOrder=new Map();
+ hand.forEach((tile,index)=>{
+   if(!originalOrder.has(tile))originalOrder.set(tile,[]);
+   originalOrder.get(tile).push(index);
+ });
+ if(sortStage===1){
+   // 1回目：萬子・筒子・索子・字牌だけをまとめ、各種類の中はまだ混在。
+   hand=hand.map((tile,index)=>({tile,index})).sort((a,b)=>{
+     const ga=Math.floor(a.tile/9),gb=Math.floor(b.tile/9);
+     return ga-gb||a.index-b.index;
+   }).map(x=>x.tile);
+ }else if(sortStage===2){
+   // 2回目：数牌は数字順。字牌はまだ配牌時の順番を残します。
+   hand=hand.map((tile,index)=>({tile,index})).sort((a,b)=>{
+     const ga=Math.floor(a.tile/9),gb=Math.floor(b.tile/9);
+     if(ga!==gb)return ga-gb;
+     if(ga<3)return a.tile-b.tile;
+     return a.index-b.index;
+   }).map(x=>x.tile);
+ }else{
+   // 3回目：字牌まで含めて完全に整列。
+   hand.sort((a,b)=>a-b);
+ }
  drawnIndex=currentDraw===null?-1:hand.lastIndexOf(currentDraw);
+ $('sortBtn').textContent=sortStage<3?`並べ替え（${sortStage+1}/3）`:'並べ替え（完了）';
+ const messages={1:'種類ごとに集めました。もう一度押すと、数牌が数字順になります。',2:'数牌を数字順にしました。もう一度押すと、字牌まで完全に整います。',3:'手牌を完全に並べ替えました。'};
+ $('playMessage').className='message';
+ $('playMessage').textContent=messages[sortStage];
  renderPlay();
 };
 $('riichiBtn').onclick=()=>{
