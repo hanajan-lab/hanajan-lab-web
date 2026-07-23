@@ -1,4 +1,4 @@
-<!-- Verified build: Ver.1.11.0 riichi sideways tile / called-tile direction -->
+<!-- Verified build: Ver.1.12.0 all kan types / rinshan / kan dora -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -135,9 +135,14 @@ button:disabled{opacity:.42;cursor:not-allowed}
 }
 .discards .mini.sideways{margin:0 2px}
 .melds{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
-.meld{display:flex;align-items:center;gap:3px;padding:7px;border:2px solid var(--pink);border-radius:10px;background:var(--pink2)}
+.meld{display:flex;align-items:center;gap:3px;padding:12px 7px 7px;border:2px solid var(--pink);border-radius:10px;background:var(--pink2)}
 .meld .mini.sideways{margin:0 7px}
-.meld-from{font-size:11px;color:var(--muted);font-weight:700;margin-left:4px;white-space:nowrap}
+.meld-tiles{display:flex;align-items:center;gap:3px}
+.meld-tile-wrap{position:relative;display:flex;align-items:center;justify-content:center}
+.meld-tile-wrap.has-added{padding-top:21px}
+.mini.added-kan{position:absolute;top:-21px;left:50%;transform:translateX(-50%) scale(.78);z-index:3}
+.mini.back .glyph{color:#8f6574}
+.mini.back .label{visibility:hidden}
 .answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 label{font-size:14px;font-weight:700}
 input{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px}
@@ -172,7 +177,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.11.0　リーチ牌・鳴き牌の横向き表示版</p>
+<p class="sub" style="font-weight:700">Ver.1.12.0　カン・嶺上牌・カンドラ対応版</p>
 </header>
 
 <section class="panel">
@@ -291,8 +296,8 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
   <span class="badge">現在の範囲</span>
   <p class="note">
     この版は、点数計算の自主練を目的にした一人用です。ツモと打牌を繰り返し、
-    あらかじめ用意された和了形に自分で気づき、「ツモ！」を宣言します。対戦相手の思考、鳴き、放銃、局進行までを再現する
-    四人対戦ゲームではありません。
+    あらかじめ用意された和了形に自分で気づき、「ツモ！」を宣言します。対戦相手の思考や完全な局進行までを再現する
+    四人対戦ゲームではありません。リーチ・チー・ポン・暗槓・大明槓・加槓・嶺上牌・カンドラを練習できます。
   </p>
 </section>
 
@@ -373,9 +378,12 @@ function doraFromIndicator(indicator){
  if(indicator>=27&&indicator<=30)return indicator===30?27:indicator+1;
  return indicator===33?31:indicator+1;
 }
-function countDora(tiles,indicator){
- const dora=doraFromIndicator(indicator);
- return tiles.filter(t=>t===dora).length;
+function countDora(tiles,indicators){
+ const list=Array.isArray(indicators)?indicators:[indicators];
+ return list.reduce((sum,indicator)=>{
+   const dora=doraFromIndicator(indicator);
+   return sum+tiles.filter(t=>t===dora).length;
+ },0);
 }
 function getStandardDecompositions(tiles,fixedMeldCount=0){
  const results=[];
@@ -436,8 +444,8 @@ function waitTypeForSequence(start,winTile){
 function decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType='ツモ',fixedMelds=[]){
  const allMelds=[...dec.melds,...fixedMelds];
  const sequences=allMelds.filter(m=>m.type==='sequence');
- const triplets=allMelds.filter(m=>m.type==='triplet');
- const closed=fixedMelds.length===0;
+ const triplets=allMelds.filter(m=>m.type==='triplet'||m.type==='quad');
+ const closed=fixedMelds.every(m=>!m.open);
  const allSequences=sequences.length===4;
  const allTiles=[...tiles,...fixedMelds.flatMap(m=>m.tiles||[m.tile,m.tile,m.tile])];
  const tanyao=allTiles.every(t=>!isTerminalOrHonor(t));
@@ -496,6 +504,11 @@ function decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType='ツモ',fi
    if(dec.pair===windMap[seat])raw+=2;
    for(const m of triplets){
      const isOpen=!!m.open;
+     if(m.type==='quad'){
+       if(isTerminalOrHonor(m.tile))raw+=isOpen?16:32;
+       else raw+=isOpen?8:16;
+       continue;
+     }
      const ronOpen=!isOpen&&winType==='ロン'&&m.tile===winTile&&possibleWaits.includes('シャンポン');
      if(isTerminalOrHonor(m.tile))raw+=(isOpen||ronOpen)?4:8;
      else raw+=(isOpen||ronOpen)?2:4;
@@ -505,9 +518,9 @@ function decompositionYakuAndFu(dec,tiles,winTile,round,seat,winType='ツモ',fi
  }
  return {yaku,han,fu,pinfu,sanshoku,tanyao,waits:possibleWaits};
 }
-function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicator,withRiichi=false,winType='ツモ',fixedMelds=[]){
+function actualHandAnswerData(tiles,winTile,round,seat,dealer,doraIndicators,withRiichi=false,winType='ツモ',fixedMelds=[]){
  const meldTiles=fixedMelds.flatMap(m=>m.tiles||[m.tile,m.tile,m.tile]);
- const doraCount=countDora([...tiles,...meldTiles],doraIndicator);
+ const doraCount=countDora([...tiles,...meldTiles],doraIndicators);
  const pointCalc=(han,fu)=>winType==='ツモ'?tsumoPoints(han,fu,dealer):ronPoints(han,fu,dealer);
 
  if(isKokushi(tiles)){
@@ -604,7 +617,7 @@ function ronPoints(han,fu,dealer){
  return `${roundUp100(base*(dealer==='親'?6:4))}`;
 }
 function playAnswerData(){
- return actualHandAnswerData(hand,winningTile,sc.round,sc.seat,sc.dealer,sc.dora,riichi,currentWinType,openMelds);
+ return actualHandAnswerData(hand,winningTile,sc.round,sc.seat,sc.dealer,visibleDoraIndicators,riichi,currentWinType,openMelds);
 }
 function scenarioAnswerData(q){
  const finalTiles=[...q.hand,q.win];
@@ -618,7 +631,7 @@ const scenarios=[
  {hand:[T.m(3),T.m(4),T.m(5),T.m(6),T.m(7),T.m(8),T.p(2),T.p(3),T.p(4),T.s(2),T.s(3),T.s(4),T.s(6)],win:T.s(6),round:'東',seat:'北',dealer:'子',dora:T.p(9),yaku:['ツモ','タンヤオ','ピンフ'],han:3,fu:20,points:'700/1300',note:'両面形のピンフツモ。'}
 ];
 
-let sc=null,hand=[],wall=[],opponentWall=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,riichiDiscardIndex=-1,sameTurnFuriten=false,riichiFuriten=false;
+let sc=null,hand=[],wall=[],opponentWall=[],deadWallIndicators=[],visibleDoraIndicators=[],discards=[],kamichaDiscards=[],toimenDiscards=[],shimochaDiscards=[],openMelds=[],drawnIndex=-1,currentDraw=null,winningTile=null,currentWinType='ツモ',awaitingDiscard=false,opponentsActing=false,awaitingRonDecision=false,lastOpponentTile=null,lastOpponentName='',pendingOpponentNext=null,resumeAfterCall=null,opponentAutoTimer=null,callLock=false,finished=false,turn=0,riichi=false,riichiJustDeclared=false,riichiDiscardIndex=-1,sameTurnFuriten=false,riichiFuriten=false;
 
 function clearOpponentAutoTimer(){
  if(opponentAutoTimer!==null){
@@ -718,14 +731,31 @@ function renderPlay(){
  $('kamichaDiscards').innerHTML=riverHtml(kamichaDiscards);
  $('toimenDiscards').innerHTML=riverHtml(toimenDiscards);
  $('shimochaDiscards').innerHTML=riverHtml(shimochaDiscards);
- const calledTilePosition={上家:0,対面:1,下家:2};
+ const calledTilePosition3={上家:0,対面:1,下家:2};
+ const calledTilePosition4={上家:0,対面:1,下家:3};
  $('openMelds').innerHTML=openMelds.map(m=>{
-   const sideways=Number.isInteger(calledTilePosition[m.from])?calledTilePosition[m.from]:-1;
-   const tiles=m.tiles.map((t,i)=>`<div class="mini${i===sideways?' sideways':''}"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`).join('');
-   return `<div class="meld">${tiles}${m.from?`<span class="meld-from">${m.from}から</span>`:''}</div>`;
+   if(m.concealed){
+     const concealedTiles=[null,m.tile,m.tile,null].map(t=>t===null
+       ?`<div class="meld-tile-wrap"><div class="mini back"><span class="glyph">🀫</span><span class="label">裏</span></div></div>`
+       :`<div class="meld-tile-wrap"><div class="mini"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div></div>`).join('');
+     return `<div class="meld"><div class="meld-tiles">${concealedTiles}</div></div>`;
+   }
+   const posMap=m.type==='quad'?calledTilePosition4:calledTilePosition3;
+   const sideways=Number.isInteger(posMap[m.from])?posMap[m.from]:-1;
+   if(m.added){
+     const base=[m.tile,m.tile,m.tile].map((t,i)=>{
+       const extra=i===calledTilePosition3[m.from]
+         ?`<div class="mini added-kan"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>`:'';
+       return `<div class="meld-tile-wrap${extra?' has-added':''}"><div class="mini${i===sideways?' sideways':''}"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div>${extra}</div>`;
+     }).join('');
+     return `<div class="meld"><div class="meld-tiles">${base}</div></div>`;
+   }
+   const tiles=m.tiles.map((t,i)=>`<div class="meld-tile-wrap"><div class="mini${i===sideways?' sideways':''}"><span class="glyph">${glyphs[t]}</span><span class="label">${labels[t]}</span></div></div>`).join('');
+   return `<div class="meld"><div class="meld-tiles">${tiles}</div></div>`;
  }).join('');
  $('openMeldArea').classList.toggle('hidden',openMelds.length===0);
  $('turn').textContent=turn;$('wallCount').textContent=wall.length;
+ $('dora').textContent=visibleDoraIndicators.map(t=>glyphs[t]).join(' ');
  // ボタンの状態を答えのヒントにしないため、対局中は全ボタンを通常表示します。
  const playing=!!sc&&!finished;
  $('drawBtn').disabled=!playing;
@@ -750,6 +780,8 @@ function startRound(){
  removeOne(sc.dora); // ドラ表示牌は王牌側
  removeOne(sc.win);  // 和了牌1枚を後で山に入れる
  shuffle(pool);
+ deadWallIndicators=pool.splice(0,4);
+ visibleDoraIndicators=[sc.dora];
  wall=pool.slice(0,17);
  const winPosition=5+Math.floor(Math.random()*13); // 6～18巡目
  wall.splice(winPosition,0,sc.win);
@@ -758,7 +790,7 @@ function startRound(){
  opponentWall=shuffle([...pool]).slice(0,54);
  discards=[];kamichaDiscards=[];toimenDiscards=[];shimochaDiscards=[];openMelds=[];
  drawnIndex=-1;currentDraw=null;winningTile=null;currentWinType='ツモ';awaitingDiscard=false;opponentsActing=false;awaitingRonDecision=false;lastOpponentTile=null;lastOpponentName='';pendingOpponentNext=null;resumeAfterCall=null;finished=false;turn=0;riichi=false;riichiJustDeclared=false;riichiDiscardIndex=-1;sameTurnFuriten=false;riichiFuriten=false;
- $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=glyphs[sc.dora];
+ $('roundWind').textContent=sc.round;$('seatWind').textContent=sc.seat;$('dealer').textContent=sc.dealer;$('dora').textContent=visibleDoraIndicators.map(t=>glyphs[t]).join(' ');
  $('playMessage').className='message';$('playMessage').textContent='13枚を配りました。親から対局を始めます。';
  $('playAnswerPanel').classList.add('hidden');$('playResult').className='result';
  $('playYaku').value='';$('playPoints').value='';
@@ -1012,7 +1044,8 @@ function discardTile(i){
 function playReveal(correct){
  const a=playAnswerData();
  const r=$('playResult');r.className='result show '+(correct?'correct':'wrong');
- const doraNote=a.doraCount?`ドラ表示は${labels[sc.dora]}、ドラは${labels[doraFromIndicator(sc.dora)]}で${a.doraCount}枚です。`:'ドラはありません。';
+ const doraNames=visibleDoraIndicators.map(i=>labels[doraFromIndicator(i)]).join('・');
+ const doraNote=a.doraCount?`ドラは${doraNames}で、合計${a.doraCount}枚です。`:`ドラ表示牌は${visibleDoraIndicators.map(i=>labels[i]).join('・')}です。手牌にドラはありません。`;
  const judgeNote=a.waits?`待ちの判定：${a.waits.join('／')}。三色とピンフは、実際の14枚から判定しています。`:'';
  r.innerHTML=`<h3>${correct?'🎉 正解！':'📖 正解はこちら'}</h3><b>${currentWinType}和了：${a.yaku.join('・')}</b><br>${a.han}翻 ${a.fu}符　<b>${a.points}</b><br>${doraNote}<br>${judgeNote}`;
 }
@@ -1166,18 +1199,90 @@ function declareKan(){
  }
  declareKanCore();
 }
+function chooseKanCandidate(candidates){
+ if(candidates.length===1)return candidates[0];
+ const lines=candidates.map((c,i)=>`${i+1}：${labels[c.tile]}（${c.kind}）`).join('\n');
+ const answer=prompt(`カンする牌を番号で選んでください。\n${lines}`,'1');
+ const n=Number(answer);
+ return Number.isInteger(n)&&n>=1&&n<=candidates.length?candidates[n-1]:null;
+}
+function revealKanDora(){
+ if(visibleDoraIndicators.length>=5||deadWallIndicators.length===0)return;
+ visibleDoraIndicators.push(deadWallIndicators.shift());
+}
+function drawRinshan(message){
+ if(wall.length===0){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='嶺上牌を引ける牌が残っていないため、カンできません。';
+   return false;
+ }
+ revealKanDora();
+ const rinshan=wall.shift();
+ hand.push(rinshan);
+ currentDraw=rinshan;
+ drawnIndex=hand.length-1;
+ awaitingDiscard=true;
+ riichiJustDeclared=false;
+ $('playMessage').className='message win';
+ $('playMessage').textContent=`${message} 新しいドラ表示牌を開き、嶺上牌の${labels[rinshan]}をツモりました。和了なら「ツモ！」、違えば1枚捨ててください。`;
+ renderPlay();
+ return true;
+}
 function declareKanCore(){
  if(!sc||finished)return;
- if(!awaitingRonDecision||lastOpponentTile===null||!pendingOpponentNext){
+
+ // 他家の捨て牌からの大明槓
+ if(awaitingRonDecision&&lastOpponentTile!==null&&pendingOpponentNext){
+   const matches=[];
+   hand.forEach((t,i)=>{if(t===lastOpponentTile)matches.push(i)});
+   if(matches.length<3){
+     $('playMessage').className='message error';
+     $('playMessage').textContent=`誤カンです。${labels[lastOpponentTile]}が手牌に3枚ありません。「次へ」で続けてください。`;
+     return;
+   }
+   if(wall.length===0){
+     $('playMessage').className='message error';
+     $('playMessage').textContent='嶺上牌を引ける牌が残っていないため、カンできません。';
+     return;
+   }
+   recordMissedRon();
+   clearOpponentAutoTimer();
+   const tile=lastOpponentTile;
+   for(const i of matches.slice(0,3).sort((a,b)=>b-a))hand.splice(i,1);
+   const riverMap={上家:kamichaDiscards,対面:toimenDiscards,下家:shimochaDiscards};
+   const river=riverMap[lastOpponentName];
+   if(river&&river[river.length-1]===tile)river.pop();
+   openMelds.push({type:'quad',tile,tiles:[tile,tile,tile,tile],open:true,from:lastOpponentName,kanType:'大明槓'});
+   resumeAfterCall=pendingOpponentNext;
+   pendingOpponentNext=null;
+   awaitingRonDecision=false;
+   opponentsActing=false;
+   currentDraw=null;
+   drawnIndex=-1;
+   riichi=false;
+   return void drawRinshan(`${lastOpponentName}の${labels[tile]}を大明槓しました。`);
+ }
+
+ // 自分のツモ番では暗槓または加槓
+ if(!awaitingDiscard){
    $('playMessage').className='message error';
-   $('playMessage').textContent='今は大明槓できる捨て牌がありません。';
+   $('playMessage').textContent='暗槓・加槓は、自分が牌をツモった後にできます。';
    return;
  }
- const matches=[];
- hand.forEach((t,i)=>{if(t===lastOpponentTile)matches.push(i)});
- if(matches.length<3){
+ if(riichi){
    $('playMessage').className='message error';
-   $('playMessage').textContent=`誤カンです。${labels[lastOpponentTile]}が手牌に3枚ありません。「次へ」で続けてください。`;
+   $('playMessage').textContent='リーチ後のカン判定は待ちが変わらない場合に限られるため、この版ではまだ扱いません。';
+   return;
+ }
+ const counts=tileCounts(hand);
+ const candidates=[];
+ counts.forEach((n,t)=>{if(n===4)candidates.push({kind:'暗槓',tile:t})});
+ openMelds.forEach((m,index)=>{
+   if(m.type==='triplet'&&m.open&&counts[m.tile]>=1)candidates.push({kind:'加槓',tile:m.tile,meldIndex:index});
+ });
+ if(candidates.length===0){
+   $('playMessage').className='message error';
+   $('playMessage').textContent='誤カンです。現在の手牌には暗槓または加槓にできる牌がありません。';
    return;
  }
  if(wall.length===0){
@@ -1185,28 +1290,29 @@ function declareKanCore(){
    $('playMessage').textContent='嶺上牌を引ける牌が残っていないため、カンできません。';
    return;
  }
- recordMissedRon();
- clearOpponentAutoTimer();
- const tile=lastOpponentTile;
- for(const i of matches.slice(0,3).sort((a,b)=>b-a))hand.splice(i,1);
- const riverMap={上家:kamichaDiscards,対面:toimenDiscards,下家:shimochaDiscards};
- const river=riverMap[lastOpponentName];
- if(river&&river[river.length-1]===tile)river.pop();
- openMelds.push({type:'quad',tile,tiles:[tile,tile,tile,tile],open:true,from:lastOpponentName});
- const rinshan=wall.shift();
- hand.push(rinshan);
- currentDraw=rinshan;
- drawnIndex=hand.length-1;
- resumeAfterCall=pendingOpponentNext;
- pendingOpponentNext=null;
- awaitingRonDecision=false;
- opponentsActing=false;
- awaitingDiscard=true;
- riichi=false;
- riichiJustDeclared=false;
- $('playMessage').className='message win';
- $('playMessage').textContent=`${lastOpponentName}の${labels[tile]}をカンしました。嶺上牌の${labels[rinshan]}をツモりました。和了なら「ツモ！」、違えば1枚捨ててください。`;
- renderPlay();
+ const chosen=chooseKanCandidate(candidates);
+ if(!chosen){
+   $('playMessage').className='message';
+   $('playMessage').textContent='カンを取り消しました。';
+   return;
+ }
+ if(chosen.kind==='暗槓'){
+   let removed=0;
+   hand=hand.filter(t=>{
+     if(t===chosen.tile&&removed<4){removed++;return false}
+     return true;
+   });
+   openMelds.push({type:'quad',tile:chosen.tile,tiles:[chosen.tile,chosen.tile,chosen.tile,chosen.tile],open:false,concealed:true,kanType:'暗槓'});
+   return void drawRinshan(`${labels[chosen.tile]}を暗槓しました。`);
+ }
+ const idx=hand.indexOf(chosen.tile);
+ hand.splice(idx,1);
+ const meld=openMelds[chosen.meldIndex];
+ meld.type='quad';
+ meld.tiles=[chosen.tile,chosen.tile,chosen.tile,chosen.tile];
+ meld.added=true;
+ meld.kanType='加槓';
+ return void drawRinshan(`${labels[chosen.tile]}を加槓しました。`);
 }
 
 function chiOptions(tile){
