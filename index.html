@@ -1,4 +1,4 @@
-<!-- Verified build: Ver.1.13.1 concealed-kan riichi fix / complete kan practice / mixed initial hand / 3-step sorting -->
+<!-- Verified build: Ver.1.13.2 robust daiminkan timing fix / concealed-kan riichi fix / complete kan practice -->
 <!doctype html>
 <html lang="ja">
 <head>
@@ -177,7 +177,7 @@ footer{text-align:center;color:var(--muted);font-size:13px;margin-top:18px}
 <header>
   <h1>🌸 花雀LAB</h1>
   <p class="sub">麻雀点数計算・声に出して自主練</p>
-<p class="sub" style="font-weight:700">Ver.1.13.1　暗槓後のリーチ対応・カン完全練習版</p>
+<p class="sub" style="font-weight:700">Ver.1.13.2　大明槓の判定修正・カン完全練習版</p>
 </header>
 
 <section class="panel">
@@ -919,7 +919,7 @@ function playInitialDealerTurns(){
        $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}は自動で次へ進みました。`;
        go();
      }
-   },8000);
+   },30000);
  };
  next();
 }
@@ -973,7 +973,7 @@ function playOpponentTurns(){
        $('playMessage').textContent=`${lastOpponentName}の${labels[lastOpponentTile]}は自動で次へ進みました。`;
        go();
      }
-   },8000);
+   },30000);
  };
  next();
 }
@@ -1259,14 +1259,20 @@ $('kanBtn').onclick=declareKan;
 
 function declareKan(){
  if(!sc||finished||callLock)return;
- if(awaitingRonDecision){
+ if(awaitingRonDecision&&lastOpponentTile!==null&&pendingOpponentNext){
+   // 「カン！」表示中に判断状態が変わらないよう、捨て牌の情報を保存します。
    clearOpponentAutoTimer();
+   const daiminkanContext={
+     tile:lastOpponentTile,
+     name:lastOpponentName,
+     next:pendingOpponentNext
+   };
    callLock=true;
    showCallAnnouncement('カン！');
-   setTimeout(()=>{callLock=false;declareKanCore();},650);
+   setTimeout(()=>{callLock=false;declareKanCore(daiminkanContext);},650);
    return;
  }
- declareKanCore();
+ declareKanCore(null);
 }
 function chooseKanCandidate(candidates){
  if(candidates.length===1)return candidates[0];
@@ -1297,16 +1303,18 @@ function drawRinshan(message){
  renderPlay();
  return true;
 }
-function declareKanCore(){
+function declareKanCore(daiminkanContext=null){
  if(!sc||finished)return;
 
- // 他家の捨て牌からの大明槓
- if(awaitingRonDecision&&lastOpponentTile!==null&&pendingOpponentNext){
+ // 他家の捨て牌からの大明槓。表示演出中も保存した捨て牌情報を使います。
+ if(daiminkanContext){
+   const tile=daiminkanContext.tile;
+   const fromName=daiminkanContext.name;
    const matches=[];
-   hand.forEach((t,i)=>{if(t===lastOpponentTile)matches.push(i)});
+   hand.forEach((t,i)=>{if(t===tile)matches.push(i)});
    if(matches.length<3){
      $('playMessage').className='message error';
-     $('playMessage').textContent=`誤カンです。${labels[lastOpponentTile]}が手牌に3枚ありません。「次へ」で続けてください。`;
+     $('playMessage').textContent=`誤カンです。${labels[tile]}が手牌に3枚ありません。「次へ」で続けてください。`;
      return;
    }
    if(wall.length===0){
@@ -1316,20 +1324,19 @@ function declareKanCore(){
    }
    recordMissedRon();
    clearOpponentAutoTimer();
-   const tile=lastOpponentTile;
    for(const i of matches.slice(0,3).sort((a,b)=>b-a))hand.splice(i,1);
    const riverMap={上家:kamichaDiscards,対面:toimenDiscards,下家:shimochaDiscards};
-   const river=riverMap[lastOpponentName];
+   const river=riverMap[fromName];
    if(river&&river[river.length-1]===tile)river.pop();
-   openMelds.push({type:'quad',tile,tiles:[tile,tile,tile,tile],open:true,from:lastOpponentName,kanType:'大明槓'});
-   resumeAfterCall=pendingOpponentNext;
+   openMelds.push({type:'quad',tile,tiles:[tile,tile,tile,tile],open:true,from:fromName,kanType:'大明槓'});
+   resumeAfterCall=daiminkanContext.next;
    pendingOpponentNext=null;
    awaitingRonDecision=false;
    opponentsActing=false;
    currentDraw=null;
    drawnIndex=-1;
    riichi=false;
-   return void drawRinshan(`${lastOpponentName}の${labels[tile]}を大明槓しました。`);
+   return void drawRinshan(`${fromName}の${labels[tile]}を大明槓しました。`);
  }
 
  // 自分のツモ番では暗槓または加槓
